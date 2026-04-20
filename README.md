@@ -6,7 +6,7 @@ little-coder takes the architecture of a cloud-powered coding assistant and make
 
 **Headline result:** `ollama/qwen3.5` (9.7B, 6.6 GB) + little-coder scores **45.56% mean** (across two full runs) on the full 225-exercise Aider Polyglot benchmark, running on a consumer laptop with no network calls. On the public leaderboard that sits above gpt-4.5-preview (44.9%) and gpt-oss-120b high (41.8%). A matched-model vanilla Aider baseline reaches 19.11%.
 
-> **The full narrative — motivation, design, methodology, results, leaderboard comparison, integrity audit, and limitations — is in the white paper at [`docs/whitepaper.md`](docs/whitepaper.md).** This README is the quick tour: what it looks like, how to run it, and how the repo is laid out. For anything about *why* the design is the way it is or *what the numbers mean*, read the paper.
+> **The full narrative — motivation, design, methodology, results, leaderboard comparison, integrity audit, and limitations — is in the white paper at https://itayinbarr.substack.com/p/honey-i-shrunk-the-coding-agent** This README is the quick tour: what it looks like, how to run it, and how the repo is laid out. For anything about *why* the design is the way it is or *what the numbers mean*, read the paper.
 
 ---
 
