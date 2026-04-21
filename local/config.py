@@ -68,6 +68,19 @@ MODEL_PROFILES: dict[str, dict] = {
         "deliberation_mode": "on_failure",
         "n_branches": 2,
     },
+    "qwen3.6-35b-a3b": {
+        "context_limit": 16384,   # match llama-server launch script; model supports 262K native
+        "max_tokens": 4096,
+        "thinking_budget": 2048,
+        "skill_token_budget": 300,
+        "knowledge_token_budget": 200,
+        "system_prompt_budget": 0,
+        "max_retries": 1,
+        "temperature": 0.3,
+        "deliberation_mode": "on_failure",
+        "n_branches": 2,
+        "prefer_text_tools": False,  # native tool support
+    },
     "gemma3:12b": {
         "context_limit": 32768,
         "max_tokens": 4096,

@@ -2,7 +2,7 @@
 
 **A Claude Code-inspired CLI coding agent, heavily optimized for small models that run on any modern consumer laptop.**
 
-little-coder takes the architecture of a cloud-powered coding assistant and makes it work with 5–10 GB local models served via Ollama, through skill-augmented tool use, domain-knowledge injection, workspace-aware context discovery, a Write-vs-Edit tool invariant, and a thinking-budget system that prevents reasoning models from hanging while preserving their partial insights.
+little-coder takes the architecture of a cloud-powered coding assistant and makes it work with 5–25 GB local models served via Ollama **or llama.cpp**, through skill-augmented tool use, domain-knowledge injection, workspace-aware context discovery, a Write-vs-Edit tool invariant, and a thinking-budget system that prevents reasoning models from hanging while preserving their partial insights.
 
 **Headline result:** `ollama/qwen3.5` (9.7B, 6.6 GB) + little-coder scores **45.56% mean** (across two full runs) on the full 225-exercise Aider Polyglot benchmark, running on a consumer laptop with no network calls. On the public leaderboard that sits above gpt-4.5-preview (44.9%) and gpt-oss-120b high (41.8%). A matched-model vanilla Aider baseline reaches 19.11%.
 
@@ -30,6 +30,8 @@ All four screenshots are real Rich-rendered SVG exports regenerated from a local
 
 ## Quick start
 
+### Option A — Ollama (simplest)
+
 ```bash
 # 1. Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
@@ -37,21 +39,54 @@ curl -fsSL https://ollama.com/install.sh | sh
 # 2. Pull a model
 ollama pull qwen3.5
 
-# 3. Clone little-coder
+# 3. Clone + install little-coder
 git clone https://github.com/itayinbarr/little-coder.git
 cd little-coder
-
-# 4. Install
 pip install -e .
 
-# 5. Run
+# 4. Run
 python little_coder.py
 # Then in the REPL:  /model ollama/qwen3.5
 ```
 
+### Option B — llama.cpp (fastest, supports MoE models like Qwen3.6-35B-A3B)
+
+```bash
+# 1. Build llama.cpp with CUDA (sm_XXX matches your GPU; Blackwell = 120)
+git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
+cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120 -DLLAMA_CURL=ON
+cmake --build build --config Release -j
+
+# 2. Fetch a GGUF (example: Qwen3.6-35B-A3B Q4_K_M, 22 GB)
+pip install -U "huggingface_hub[cli]"
+hf download unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
+   --local-dir ~/models
+
+# 3. Serve it (MoE trick: keep experts in RAM, attention on GPU)
+build/bin/llama-server -m ~/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
+   --host 127.0.0.1 --port 8888 --jinja \
+   -c 16384 -ngl 99 --n-cpu-moe 999 --flash-attn on
+
+# 4. Point little-coder at it
+cd /path/to/little-coder && pip install -e .
+python little_coder.py --model llamacpp/qwen3.6-35b-a3b
+# or for the 9B backup:  --model llamacpp/qwen3.5-9b
+```
+
+Set `LLAMACPP_BASE_URL=http://localhost:8888/v1` if you run the server on a different host or port.
+
 ---
 
 ## Supported models
+
+### via llama.cpp (new in v0.0.3)
+
+| Model | Size | Notes |
+|---|---|---|
+| **Qwen3.6-35B-A3B** | 22 GB (Q4_K_M) | Sparse MoE, 35B total / 3B active — runs at ~38 tok/s on an 8 GB laptop GPU with `--n-cpu-moe 999`. Passes tasks that Qwen3.5 9B fails (e.g. `book-store`) on the first attempt. |
+| Qwen3.5-9B | 5.3 GB (Q4_K_M) | Dense 9.7B, same model used for the v0.0.2 headline benchmark. |
+
+### via Ollama
 
 | Model | Size | Notes |
 |---|---|---|
@@ -94,7 +129,7 @@ python little_coder.py [options]
 ```
 little_coder.py          # REPL, slash commands, rendering
 agent.py                 # Core agent loop with small-model adaptations
-providers.py             # Multi-provider streaming (Ollama, Anthropic, OpenAI-compat)
+providers.py             # Multi-provider streaming (Ollama, llama.cpp, Anthropic, OpenAI-compat)
 tools.py                 # 8 core tools + Write-vs-Edit invariant
 tool_registry.py         # Tool registration and dispatch
 context.py               # System prompt builder (base + skills + knowledge)

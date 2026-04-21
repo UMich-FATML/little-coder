@@ -12,12 +12,14 @@ Supported providers:
   minimax    — MiniMax (MiniMax-Text-01, abab6.5s-chat, ...)
   ollama     — Local Ollama (llama3.3, qwen2.5-coder, ...)
   lmstudio   — Local LM Studio (any loaded model)
+  llamacpp   — Local llama.cpp llama-server (any loaded GGUF)
   custom     — Any OpenAI-compatible endpoint
 
 Model string formats:
   "claude-opus-4-6"          auto-detected → anthropic
   "gpt-4o"                   auto-detected → openai
   "ollama/qwen2.5-coder"     explicit provider prefix
+  "llamacpp/qwen3.6-35b-a3b" llama-server on LLAMACPP_BASE_URL (default :8888/v1)
   "custom/my-model"          uses CUSTOM_BASE_URL from config
 """
 from __future__ import annotations
@@ -129,6 +131,14 @@ PROVIDERS: dict[str, dict] = {
         "api_key":    "lm-studio",
         "context_limit": 128000,
         "models": [],   # dynamic, depends on loaded model
+    },
+    "llamacpp": {
+        "type":       "openai",   # llama-server exposes /v1/chat/completions
+        "api_key_env": None,
+        "base_url":   "http://localhost:8888/v1",
+        "api_key":    "none",
+        "context_limit": 16384,   # match default launch script; override via LLAMACPP_BASE_URL server
+        "models": [],             # dynamic, depends on which GGUF is loaded
     },
     "custom": {
         "type":       "openai",
@@ -774,6 +784,12 @@ def stream(
                     "custom provider requires a base_url. "
                     "Set CUSTOM_BASE_URL env var or run: /config custom_base_url=http://..."
                 )
+        elif provider_name == "llamacpp":
+            base_url = (
+                _os.environ.get("LLAMACPP_BASE_URL")
+                or config.get("llamacpp_base_url")
+                or prov.get("base_url", "http://localhost:8888/v1")
+            )
         else:
             base_url = prov.get("base_url", "https://api.openai.com/v1")
         yield from stream_openai_compat(
