@@ -184,11 +184,15 @@ class _TmuxShellProxy:
 
 
 class LittleCoderAgent(BaseAgent):
-    """Terminal-Bench adapter for little-coder-pi."""
+    """Terminal-Bench adapter for little-coder (v0.1.0+ pi port)."""
 
     @staticmethod
     def name() -> str:
-        return "little-coder-pi"
+        # Leaderboard display name — matches the 0.1.0 release. The
+        # (agent × model) pair shown on tbench.ai will be
+        # "little-coder" × whatever TB_LITTLE_CODER_MODEL resolves to
+        # (default llamacpp/qwen3.6-35b-a3b).
+        return "little-coder"
 
     def __init__(
         self,
