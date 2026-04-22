@@ -54,7 +54,7 @@ export default function (pi: ExtensionAPI) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 30_000);
         const res = await fetch(url, {
-          headers: { "User-Agent": "little-coder-pi/0.1" },
+          headers: { "User-Agent": "little-coder/0.1" },
           redirect: "follow",
           signal: controller.signal,
         });

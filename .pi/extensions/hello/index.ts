@@ -2,6 +2,6 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.notify("little-coder-pi scaffold loaded", "info");
+    ctx.ui.notify("little-coder scaffold loaded", "info");
   });
 }

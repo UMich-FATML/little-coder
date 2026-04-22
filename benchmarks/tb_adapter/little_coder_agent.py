@@ -1,4 +1,4 @@
-"""Terminal-Bench BaseAgent adapter for little-coder-pi.
+"""Terminal-Bench BaseAgent adapter for little-coder.
 
 Ported from benchmarks/tb_adapter/little_coder_agent.py in the Python
 little-coder. Still a Python class (TB imports it via --agent-import-path),
@@ -237,7 +237,7 @@ class LittleCoderAgent(BaseAgent):
         log_fh = None
         if logging_dir is not None:
             logging_dir.mkdir(parents=True, exist_ok=True)
-            log_fh = (logging_dir / "little_coder_pi.log").open("w")
+            log_fh = (logging_dir / "little_coder.log").open("w")
 
         prompt = (
             "You are solving a Terminal-Bench task inside a Linux container.\n"

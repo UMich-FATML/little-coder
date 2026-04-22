@@ -1,4 +1,4 @@
-"""JSON-RPC client for little-coder-pi.
+"""JSON-RPC client for little-coder.
 
 Spawns `pi --mode rpc --no-session` as a subprocess and speaks JSONL.
 Provides:

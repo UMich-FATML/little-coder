@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Convenience wrapper for running Terminal-Bench tasks through the
-# little-coder-pi adapter. Used for pilot runs where we run one or a few
+# little-coder adapter. Used for pilot runs where we run one or a few
 # tasks at a time and inspect the trajectory between runs.
 #
 # Usage:

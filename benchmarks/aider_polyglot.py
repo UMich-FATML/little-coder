@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aider Polyglot runner for little-coder-pi.
+"""Aider Polyglot runner for little-coder.
 
 Drives `pi --mode rpc` per exercise via benchmarks/rpc_client.py::PiRpc.
 Per-language transforms (xit-strip, @Disabled-strip, cpp CMakeLists

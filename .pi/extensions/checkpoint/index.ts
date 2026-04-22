@@ -6,12 +6,12 @@ import { homedir } from "node:os";
 // Port of checkpoint/hooks.py. Snapshots a file's contents before a Write
 // or Edit tool modifies it. First-write-wins per session (don't re-backup
 // a file already tracked this session). Backups land in
-// ~/.little-coder-pi/checkpoints/<session>/.
+// ~/.little-coder/checkpoints/<session>/.
 
 const tracked = new Map<string, Set<string>>(); // sessionId -> absolute paths
 
 function checkpointDir(sessionId: string): string {
-  const dir = join(homedir(), ".little-coder-pi", "checkpoints", sessionId);
+  const dir = join(homedir(), ".little-coder", "checkpoints", sessionId);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }
