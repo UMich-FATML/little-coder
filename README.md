@@ -1,24 +1,39 @@
 # little-coder
 
-**A pi-based coding agent optimized for small local language models.**
+**A coding agent tuned for small local models, built on top of [pi](https://pi.dev).**
 
-little-coder started as a Claude Code-inspired Python CLI that adapts a cloud-style coding agent to 5–25 GB local models served via Ollama or llama.cpp. With v0.1.0 the agent has been ported onto **[pi](https://github.com/badlogic/pi-mono)** (`@mariozechner/pi-coding-agent`) as a set of TypeScript extensions. Every mechanism the whitepaper cites as load-bearing — Write-vs-Edit invariant, per-turn skill injection, algorithm-cheat-sheet injection, thinking-budget cap, output-parser, quality monitor, per-model profiles, evidence-aware compaction — is preserved as a pi extension.
+Frontier-coding-agent ergonomics for 5–25 GB models running on your own laptop GPU. Every small-model-specific adaptation the whitepaper found load-bearing — the Write-vs-Edit tool invariant, per-turn tool-skill injection, algorithm-cheat-sheet injection, thinking-budget cap, output-repair, quality monitor, per-benchmark profiles — ships as a pi extension.
 
-**Paper result (v0.0.2):** `ollama/qwen3.5` (9.7B, 6.6 GB) + little-coder scored **45.56 % mean across two full runs** of the Aider Polyglot benchmark — above gpt-4.5-preview (44.9 %) and gpt-oss-120b high (41.8 %) on the public leaderboard. Matched-model vanilla Aider baseline: 19.11 %. The whitepaper — *Honey, I Shrunk the Coding Agent* — is published on Substack: **https://open.substack.com/pub/itayinbarr/p/honey-i-shrunk-the-coding-agent**. The exact codebase that produced those numbers is preserved at tag **[`v0.0.2`](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.2)** (commit `1d62bde`) — check it out to reproduce.
+## How it relates to pi
 
-**Best Polyglot result (v0.0.5):** `llamacpp/qwen3.6-35b-a3b` (Qwen3.6-35B-A3B MoE, 22 GB Q4_K_M) + little-coder scored **78.67 %** on the same 225-exercise benchmark, running on an 8 GB laptop GPU. Tag **[`v0.0.5`](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.5)** preserves that codebase; the full write-up is in [`docs/benchmark-qwen3.6-35b-a3b.md`](docs/benchmark-qwen3.6-35b-a3b.md).
+[pi](https://pi.dev) is the minimal substrate — agent loop, multi-provider API, TUI, session tree, compaction, extension model. Four built-in tools (read / write / edit / bash) and a ~1000-token system prompt.
 
-**Terminal-Bench result (v0.1.4):** same model, same hardware, different benchmark — on the full leaderboard-valid [`terminal-bench-core@0.1.1`](https://www.tbench.ai/docs/submitting-to-leaderboard) set (80 tasks), little-coder scored **32 / 80 = 40.0 %** in 6 h 50 min. Run details and per-task breakdown in [`docs/benchmark-terminal-bench-v0.1.1.md`](docs/benchmark-terminal-bench-v0.1.1.md). Results JSON at `benchmarks/tb_runs/leaderboard-2026-04-23__00-14-03/results.json` (local).
+little-coder is **pi + 16 extensions + 30 skill markdown files + a Python benchmark harness**. It doesn't fork pi or shadow its CLI — pi is a plain dependency in `package.json`, and everything little-coder-specific lives under `.pi/extensions/`, `skills/`, and `benchmarks/`. You can mix little-coder with pi packages from anyone else, add your own extensions, or disable ours per-project via `.pi/settings.json`.
 
-**Terminal-Bench 2.0 ready (v0.1.6):** adapter for the [harbor](https://github.com/laude-institute/harbor) framework lives at `benchmarks/harbor_adapter/little_coder_agent.py`, subclassing `harbor.agents.base.BaseAgent` and proxying ShellSession through harbor's async `BaseEnvironment.exec()` instead of TB 1.0's `TmuxSession.send_keys()`. The 89-task `terminal-bench@2.0` dataset is the successor to the v0.1.1 leaderboard set. Pilot launcher: `benchmarks/harbor_pilot.sh <task-id>`.
+If you've never used pi, it's useful to skim [pi.dev](https://pi.dev) first — the rest of this doc assumes pi's model of `--agent-import-path`, `--mode rpc`, and `.pi/extensions/` auto-discovery.
 
-**v0.1.0** is a heavy architectural upgrade that ports the agent onto pi without regressing the whitepaper's result path. See [`CHANGELOG.md`](CHANGELOG.md) for details.
+## Paper / benchmark results
+
+| Release | Model | Benchmark | Result |
+|---|---|---|---|
+| [**v0.0.2**](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.2) (commit `1d62bde`) — the paper | Qwen3.5-9B via Ollama | Aider Polyglot (225 exercises) | **45.56 %** mean of two runs; matched-model vanilla Aider baseline 19.11 %. Paper: [*Honey, I Shrunk the Coding Agent* on Substack](https://open.substack.com/pub/itayinbarr/p/honey-i-shrunk-the-coding-agent). |
+| [**v0.0.5**](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.5) — pre-pi Python | Qwen3.6-35B-A3B via llama.cpp | Aider Polyglot | **78.67 %**. [Full narrative](docs/benchmark-qwen3.6-35b-a3b.md). |
+| [**v0.1.4**](https://github.com/itayinbarr/little-coder/releases/tag/v0.1.4) — on pi | Qwen3.6-35B-A3B via llama.cpp | Terminal-Bench-Core v0.1.1 (80 tasks) | **40.0 %** in 6 h 50 min. [Write-up](docs/benchmark-terminal-bench-v0.1.1.md). |
+| v0.1.9+ — in progress | Qwen3.6-35B-A3B via llama.cpp | Terminal-Bench 2.0 (89 tasks × 5 trials) | — |
+
+All runs used a consumer laptop: i9-14900HX, 32 GB RAM, **8 GB VRAM** on RTX 5070 Laptop (Blackwell). No cloud inference at any point.
 
 ---
 
-## Quick start
+## Setup
 
-### 1. Install Node.js 20+ and the little-coder dependencies
+### What you'll need
+
+- **Node.js 20+** — for pi's runtime. `node --version`.
+- **Either a local model** (llama.cpp or Ollama on your machine) **or an API key** for any pi-supported cloud provider (Anthropic, OpenAI, Google, Groq, Cerebras, Mistral, xAI, …).
+- **(Benchmarks only)** Python 3.10+ and Docker. Not needed for interactive use.
+
+### Step 1 — Clone and install
 
 ```bash
 git clone https://github.com/itayinbarr/little-coder.git
@@ -26,113 +41,141 @@ cd little-coder
 npm install
 ```
 
-### 2. Serve a model locally
+`npm install` pulls pi (`@mariozechner/pi-coding-agent`) and the small TypeBox schema helper. pi's CLI ends up at `./node_modules/.bin/pi` — add it to your PATH or use `npx pi` if you prefer.
 
-**Option A — llama.cpp** (fastest, supports MoE models like Qwen3.6-35B-A3B):
+That's the whole install. No Python needed unless you're running a benchmark.
+
+### Step 2 — Serve a model (or add a key)
+
+**Option A — llama.cpp** (fastest for local; supports Qwen3.6-35B-A3B MoE):
 
 ```bash
-# Build llama.cpp with CUDA (sm_XXX matches your GPU; Blackwell = 120)
+# One-time: build llama.cpp with CUDA (sm_XXX = your GPU arch; Blackwell = 120)
 git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
 cmake -B build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120 -DLLAMA_CURL=ON
 cmake --build build --config Release -j
 
-# Fetch a GGUF (Qwen3.6-35B-A3B Q4_K_M, 22 GB)
+# Fetch a GGUF
 pip install -U "huggingface_hub[cli]"
-hf download unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
-   --local-dir ~/models
+hf download unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_M.gguf --local-dir ~/models
 
-# Serve (MoE trick: experts in RAM, attention on GPU)
+# Serve it (MoE trick: experts in RAM, attention on GPU → 22 GB model on 8 GB VRAM)
 build/bin/llama-server -m ~/models/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf \
    --host 127.0.0.1 --port 8888 --jinja \
    -c 16384 -ngl 99 --n-cpu-moe 999 --flash-attn on
 ```
 
-**Option B — Ollama** (simplest):
+**Option B — Ollama** (simpler, but slower on MoE):
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen3.5
+ollama pull qwen3.5        # 9.7B — the paper's model
+# or: ollama pull qwen3.6-35b-a3b
 ```
 
-### 3. Run little-coder
+**Option C — a cloud provider.** Set the provider's key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.) and pi will discover it. All small-model-specific extensions auto-disable for large/cloud models so they don't interfere.
+
+### Step 3 — Run
 
 ```bash
-cd /path/to/little-coder
+# Interactive TUI
+./node_modules/.bin/pi --model llamacpp/qwen3.6-35b-a3b
 
-# Interactive
-LLAMACPP_API_KEY=noop ./node_modules/.bin/pi --model llamacpp/qwen3.6-35b-a3b
+# Single prompt, exit
+./node_modules/.bin/pi -p "read README.md and summarize" --model llamacpp/qwen3.6-35b-a3b
 
-# Single prompt
-LLAMACPP_API_KEY=noop ./node_modules/.bin/pi \
-  --model llamacpp/qwen3.6-35b-a3b \
-  -p "read README.md and tell me what this repo does"
+# Any pi-supported cloud model works too
+./node_modules/.bin/pi --model anthropic/claude-opus-4-5
 ```
 
-`LLAMACPP_BASE_URL` / `OLLAMA_BASE_URL` override the default ports (`http://127.0.0.1:8888/v1` and `http://127.0.0.1:11434/v1`).
-
-### 4. Run a benchmark
+For local providers pi still wants **some** value in the API-key env — anything is fine since llama.cpp/Ollama ignore it:
 
 ```bash
-# Quick smoke
+export LLAMACPP_API_KEY=noop
+export OLLAMA_API_KEY=noop
+```
+
+`LLAMACPP_BASE_URL` and `OLLAMA_BASE_URL` override the defaults (`http://127.0.0.1:8888/v1`, `http://127.0.0.1:11434/v1`).
+
+### Step 4 — (optional) Run a benchmark
+
+```bash
+# Quick smoke — one prompt through the whole stack
 python3 benchmarks/smoke.py "What is 2+2?"
 
-# Single Polyglot exercise
+# One Aider Polyglot exercise
 python3 benchmarks/aider_polyglot.py --exercise affine-cipher --language python --verbose
 
-# Full Polyglot language (Python, 34 exercises)
-python3 benchmarks/aider_polyglot.py --language python --resume
+# Terminal-Bench 1.0 pilot (needs the terminal-bench pip package + Docker)
+pip install terminal-bench
+benchmarks/tb_pilot.sh hello-world
+
+# Terminal-Bench 2.0 pilot (needs the harbor pip package + Docker)
+uv tool install harbor        # or: pip install harbor
+benchmarks/harbor_pilot.sh fix-git
 ```
 
 ---
 
-## Architecture (v0.1.0)
+## Troubleshooting
+
+**`pi: command not found`** — you're calling `pi` without `npx` or PATH. Use `./node_modules/.bin/pi` from the repo root or `npx pi`.
+
+**`ECONNREFUSED 127.0.0.1:8888`** — llama.cpp isn't running. Start `llama-server` first, or switch `--model` to an Ollama/cloud ID.
+
+**No API key env var warning** — pi expects *some* key even for local providers. Export `LLAMACPP_API_KEY=noop` (or `OLLAMA_API_KEY=noop`) before launching.
+
+**Extension load failures on startup** — run `./node_modules/.bin/pi --list-models` with `--verbose` — extension errors surface there. Common cause: deleted `node_modules` (re-run `npm install`).
+
+**Benchmarks can't find pi** — the benchmark harnesses expect `./node_modules/.bin/pi` relative to the repo root. If you moved things, set `PI_BIN` env or run from the repo root.
+
+---
+
+## Architecture
 
 ```
 little-coder/
 ├── .pi/
-│   ├── settings.json               # per-model profiles + benchmark_overrides.terminal_bench + .gaia
-│   └── extensions/                 # 15 TypeScript extensions, auto-discovered by pi
+│   ├── settings.json               # per-model profiles + benchmark_overrides (terminal_bench, gaia)
+│   └── extensions/                 # 16 TypeScript extensions, auto-discovered by pi
 │       ├── llama-cpp-provider/     # registers llamacpp/* and ollama/* as OpenAI-compat providers
 │       ├── write-guard/            # Write refuses on existing files — the whitepaper invariant
 │       ├── extra-tools/            # glob, webfetch, websearch (pi ships grep/find)
 │       ├── skill-inject/           # per-turn tool-skill selection (error > recency > intent)
 │       ├── knowledge-inject/       # algorithm cheat-sheet scoring (word=1.0, bigram=2.0, threshold=2.0)
-│       ├── output-parser/          # repair malformed ```tool, <tool_call>, and bare JSON output
+│       ├── output-parser/          # repair malformed ```tool, <tool_call>, bare JSON
 │       ├── quality-monitor/        # empty / hallucinated / loop detection + correction follow-up
 │       ├── thinking-budget/        # cap thinking tokens per turn, retry with thinking off
 │       ├── permission-gate/        # bash whitelist (ls, cat, git log/status/diff, etc.)
 │       ├── checkpoint/             # snapshot files before Write/Edit
-│       ├── tool-gating/            # enforces _allowed_tools on tool_call + skill filter
-│       ├── turn-cap/               # max_turns abort (Polyglot unbounded, TB=25, GAIA=30)
+│       ├── tool-gating/            # enforces _allowed_tools at exec + schema levels
+│       ├── turn-cap/               # max_turns abort (Polyglot unbounded, TB 40, GAIA 30)
 │       ├── benchmark-profiles/     # reads settings.json → systemPromptOptions + sets temperature
 │       ├── shell-session/          # ShellSession[Cwd|Reset] — tmux-proxy + subprocess backends
-│       ├── browser/                # Playwright-powered Browser[Navigate|Click|Type|Scroll|Extract|Back|History]
+│       ├── browser/                # Playwright BrowserNavigate/Click/Type/Scroll/Extract/Back/History
 │       ├── evidence/               # EvidenceAdd/Get/List — per-session store, 1 KB snippet cap
 │       └── evidence-compact/       # preserves evidence across pi's auto-compaction
-├── skills/
-│   ├── tools/*.md                  # 14 tool-usage guidance files
-│   ├── knowledge/*.md              # 13 algorithm cheat sheets
-│   └── protocols/*.md              # 3 research/cite/decomposition workflows
+├── skills/                         # 30 markdown files the extensions inject on demand
+│   ├── tools/*.md                  #   14 tool-usage cards
+│   ├── knowledge/*.md              #   13 algorithm cheat sheets
+│   └── protocols/*.md              #    3 research/cite/decomposition workflows
 ├── benchmarks/
-│   ├── rpc_client.py               # PiRpc — spawns `pi --mode rpc`, demuxes events/responses/UI requests
-│   ├── aider_polyglot.py           # Polyglot driver, per-language transforms preserved
-│   ├── tb_adapter/
-│   │   └── little_coder_agent.py   # Terminal-Bench BaseAgent subclass, tmux-proxy sidecar
-│   ├── gaia_scorer.py              # unchanged Python scorer
-│   ├── smoke.py                    # single-prompt quick tester
-│   └── test_rpc_client.py          # pytest for the RPC client
-├── AGENTS.md                       # project system prompt (replaces Python context.py)
-├── models.json                     # documentation-only copy of the provider registration
-├── package.json, tsconfig.json, vitest.config.ts
+│   ├── rpc_client.py               # PiRpc — spawns `pi --mode rpc`, demuxes events + UI requests
+│   ├── aider_polyglot.py           # Polyglot driver with per-language transforms
+│   ├── tb_adapter/                 # Terminal-Bench 1.0 BaseAgent (tmux-proxy)
+│   ├── harbor_adapter/             # Terminal-Bench 2.0 BaseAgent (async env.exec proxy)
+│   ├── tb_pilot.sh / harbor_pilot.sh
+│   ├── tb_status.sh / harbor_status.sh
+│   └── test_rpc_client.py
+├── AGENTS.md                       # project system prompt (pi discovers it automatically)
+├── models.json                     # documented provider registration (extension is canonical)
 └── docs/
-    ├── whitepaper.md               # the paper — canonical version on Substack (see README top)
-    ├── architecture.md             # v0.0.5-era Python architecture (preserved)
-    ├── benchmark-qwen3.6-35b-a3b.md# v0.0.5 78.67% narrative
-    ├── benchmark-reproduction.md   # v0.0.2 two-run reproduction
-    └── benchmark-baseline-aider.md # vanilla-Aider scaffold ablation
+    ├── whitepaper.md               # local copy; canonical on Substack (linked above)
+    ├── benchmark-*.md              # per-benchmark narratives
+    └── architecture.md             # v0.0.5-era Python architecture (historical)
 ```
 
-**Key invariant:** pi is a minimal base (4 core tools, ~1000-token system prompt, no sub-agents / MCP / permission popups by design). Every little-coder mechanism ships as a pi extension that hooks pi's lifecycle events (`before_agent_start`, `context`, `before_provider_request`, `tool_call`, `tool_result`, `turn_end`, `session_compact`). The extensions are independent and can be enabled/disabled per deployment via `.pi/settings.json`.
+**Key invariant.** pi is a minimal base by design. Every little-coder mechanism ships as a pi extension that hooks pi's lifecycle events (`before_agent_start`, `context`, `before_provider_request`, `tool_call`, `tool_result`, `turn_end`, `session_compact`). Extensions are independent and can be enabled/disabled per deployment via `.pi/settings.json`. If you don't want one, delete its directory or disable it in settings; if you want to add another, drop it next to the existing ones.
 
 ---
 
@@ -142,18 +185,14 @@ little-coder/
 git clone https://github.com/itayinbarr/little-coder.git
 cd little-coder
 git checkout v0.0.2
-# Follow that version's README for its Python setup — pip install -e .
+# Follow that version's README for its Python setup (pip install -e .)
 ```
 
-The paper ran `ollama/qwen3.5` through the Python little-coder at commit **`1d62bde`** (tag [`v0.0.2`](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.2)). The 45.56 % mean figure is the average of two full 225-exercise runs on that exact codebase.
-
-For the **78.67 % headline**, check out tag [`v0.0.5`](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.5) and follow that version's llama.cpp instructions with Qwen3.6-35B-A3B.
+The paper ran `ollama/qwen3.5` through the Python little-coder at commit **`1d62bde`** (tag [`v0.0.2`](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.2)). The 45.56 % mean figure is the average of two full 225-exercise runs on that exact codebase. For the 78.67 % headline, check out tag [`v0.0.5`](https://github.com/itayinbarr/little-coder/releases/tag/v0.0.5) — both are pre-pi Python and follow the pre-pi setup.
 
 ---
 
 ## Citation
-
-If you reference little-coder or its Aider Polyglot result in academic work, please cite the white paper:
 
 ```bibtex
 @misc{inbar2026littlecoder,
@@ -171,11 +210,11 @@ If you reference little-coder or its Aider Polyglot result in academic work, ple
 
 ## Attribution
 
-little-coder v0.0.x was a derivative work of [CheetahClaws / ClawSpring](https://github.com/SafeRL-Lab/clawspring) by SafeRL-Lab, licensed under Apache 2.0. The upstream project provided the Python agent substrate, tool system, multi-provider support, and REPL.
+little-coder v0.0.x was a derivative work of [CheetahClaws / ClawSpring](https://github.com/SafeRL-Lab/clawspring) by SafeRL-Lab, Apache 2.0. That upstream provided the Python agent substrate, tool system, multi-provider support, and REPL.
 
-little-coder v0.1.0 replaces that substrate with **pi** ([`@mariozechner/pi-coding-agent`](https://github.com/badlogic/pi-mono)) by Mario Zechner, also licensed under Apache 2.0 / MIT. The pi-mono runtime provides the agent loop, provider abstraction, TUI, and extension model; little-coder rebuilds its small-model adaptations on top of it.
+little-coder v0.1.0+ replaces that substrate with **[pi](https://github.com/badlogic/pi-mono)** (`@mariozechner/pi-coding-agent`) by Mario Zechner — Apache 2.0 / MIT. pi provides the agent loop, provider abstraction, TUI, and extension model. little-coder rebuilds its small-model adaptations on top of pi as extensions.
 
-All little-coder-specific mechanisms — Write-vs-Edit invariant, skill / knowledge injection, thinking-budget cap, output-parser, quality-monitor, per-model profiles, per-benchmark overrides, ShellSession/Browser/Evidence tool families, evidence-aware compaction — are preserved across versions.
+All little-coder-specific mechanisms — Write-vs-Edit invariant, skill / knowledge injection, thinking-budget cap, output-parser, quality-monitor, per-model profiles, per-benchmark overrides, ShellSession / Browser / Evidence tool families, evidence-aware compaction — are preserved across versions.
 
 ---
 

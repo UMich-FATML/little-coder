@@ -2,6 +2,20 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.11] — 2026-04-24
+
+### Changed — README rewritten for the post-pi-migration audience
+Community feedback after the pi port: new users weren't sure how to set little-coder up now that it's pi-based. This release rewrites the README around that concern, modeled after [pi.dev](https://pi.dev)'s terse, conversational style.
+
+- **New lead**: one-sentence what-it-is + a "How it relates to pi" section that explains little-coder is `pi + 16 extensions + 30 skill markdown files + a Python benchmark harness` — not a fork, not a wrapper, just extensions on a plain `package.json` dependency.
+- **Setup section reorganized** into clear steps: what-you'll-need → clone+install → serve a model (llama.cpp / Ollama / cloud) → run → (optional) benchmark. Each step does one thing.
+- **New Troubleshooting section** for the failure modes new users actually hit: `pi: command not found`, `ECONNREFUSED 127.0.0.1:8888`, missing API-key env warning, extension load failures, benchmark harness not finding pi.
+- **Results table** instead of loose paragraphs — each published benchmark number with its exact tag, model, dataset, and link to the per-benchmark write-up. Paper result (v0.0.2), Polyglot 78.67 % (v0.0.5), Terminal-Bench 1.0 40 % (v0.1.4), Terminal-Bench 2.0 (in progress).
+- **Architecture diagram updated** to show both `tb_adapter/` and `harbor_adapter/` (TB 1.0 + 2.0), both pilot + status scripts, and the extension count bumped to 16 (evidence-compact now included).
+- Citation / Attribution / License sections unchanged.
+
+No code or behavior change. `benchmarks/tb_runs/` and `benchmarks/harbor_runs/` remain gitignored; in-flight run artifacts from the current TB 2.0 run are not included in this commit.
+
 ## [v0.1.10] — 2026-04-23
 
 ### Fixed — critical status-script reward-field bug
