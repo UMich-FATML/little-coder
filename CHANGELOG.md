@@ -2,6 +2,16 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.10] — 2026-04-23
+
+### Fixed — critical status-script reward-field bug
+- **`benchmarks/harbor_status.sh` added** with the *correct* field path for harbor's reward schema.
+- Harbor stores the verifier reward at **`verifier_result.rewards.reward`** in each trial's `result.json`. My initial inline status queries were looking at top-level `reward` and `parser_results[0].reward` — both of which are `None` in every harbor run. The result was **every in-flight status check reported 0 % accuracy**, regardless of actual passes.
+- Concrete consequence during the 89-task TB 2.0 run: I reported "0 / 11 = 0.0 %" and later "0 / 19 = 0.0 %" when actual numbers were **7 / 19 = 36.8 %**. Passes including `prove-plus-comm`, `pytorch-model-cli` (which failed on TB 1.0 — an outright port win), `merge-diff-arc-agi-task`, and four others were silently labeled failures.
+- The running TB 2.0 run itself is unaffected — only my reading of it was wrong. `reward.txt` in each trial dir has always had the correct 0/1 value.
+
+`benchmarks/tb_status.sh` (TB 1.0) is unchanged — TB 1.0's `is_resolved` field lives at the top level and that schema was being read correctly.
+
 ## [v0.1.9] — 2026-04-23
 
 ### Fixed — version string drift
