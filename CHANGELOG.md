@@ -2,6 +2,19 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.7] — 2026-04-23
+
+### Fixed
+- **`benchmarks/harbor_pilot.sh` flag name.** Used `--task-ids` (TB 1.0 convention) where harbor expects `--include-task-name` for per-task filtering from a registry dataset. v0.1.6 shipped with the wrong flag; this release fixes it.
+- **Reproducibility note: v0.1.4 did not actually commit `.pi/settings.json`.** My v0.1.4 commit message claimed `max_turns` bumped from 25 to 40, but I forgot to stage the settings file — only the test that asserts `max_turns == 40` and the Python default (`LittleCoderAgent(max_turns=40)`) went in. The **TB leaderboard 40 % run did in fact use max_turns=40** (my local working file had the change and the running `pi` subprocess read it on launch), so the published result stands — but anyone cloning v0.1.4 and running `vitest` would have hit a test failure on a vanilla checkout. The settings.json change landed correctly in v0.1.6; from v0.1.6 onward the setting is committed-and-reproducible.
+
+### Added — empirical verification of the TB 2.0 adapter
+- Ran `benchmarks/harbor_pilot.sh fix-git` against `terminal-bench@2.0` (difficulty=easy, expert time 5 min): **reward 1.0, 1 m 50 s**. First real-task confirmation that:
+  - harbor's agent discovery via `--agent-import-path benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent` works.
+  - The async `environment.exec()` ↔ sync PiRpc reader-thread bridge via `asyncio.run_coroutine_threadsafe()` is functional.
+  - Cwd tracking through the sentinel `pwd` append preserves stateful-shell semantics across tool calls.
+  - pi extensions load cleanly in harbor's container environment.
+
 ## [v0.1.6] — 2026-04-23
 
 ### Added — Terminal-Bench 2.0 (harbor) adapter

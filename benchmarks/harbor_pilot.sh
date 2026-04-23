@@ -28,7 +28,7 @@ fi
 
 TASK_FLAGS=()
 for t in "$@"; do
-  TASK_FLAGS+=(--task-ids "$t")
+  TASK_FLAGS+=(--include-task-name "$t")
 done
 
 export TB_LITTLE_CODER_MODEL="$MODEL"
