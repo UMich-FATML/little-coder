@@ -95,9 +95,10 @@ For local providers pi still wants **some** value in the API-key env — anythin
 ```bash
 export LLAMACPP_API_KEY=noop
 export OLLAMA_API_KEY=noop
+export OPENAI_COMPAT_API_KEY=noop
 ```
 
-`LLAMACPP_BASE_URL` and `OLLAMA_BASE_URL` override the defaults (`http://127.0.0.1:8888/v1`, `http://127.0.0.1:11434/v1`).
+`LLAMACPP_BASE_URL`, `OLLAMA_BASE_URL`, and `OPENAI_COMPAT_BASE_URL` override the defaults (`http://127.0.0.1:8888/v1`, `http://127.0.0.1:11434/v1`, `http://fs-mbz-gpu-257:8000/v1`).
 
 ### Step 4 — (optional) Run a benchmark
 
@@ -112,9 +113,13 @@ python3 benchmarks/aider_polyglot.py --exercise affine-cipher --language python 
 pip install terminal-bench
 benchmarks/tb_pilot.sh hello-world
 
-# Terminal-Bench 2.0 pilot (needs the harbor pip package + Docker)
+# Terminal-Bench 2.0 pilot / full run (harbor + Daytona by default)
 uv tool install harbor        # or: pip install harbor
+export DAYTONA_API_KEY=...
+export OPENAI_COMPAT_BASE_URL=http://fs-mbz-gpu-257:8000/v1
+export OPENAI_COMPAT_API_KEY=noop
 benchmarks/harbor_pilot.sh fix-git
+benchmarks/harbor_full.sh
 ```
 
 ---
@@ -125,7 +130,9 @@ benchmarks/harbor_pilot.sh fix-git
 
 **`ECONNREFUSED 127.0.0.1:8888`** — llama.cpp isn't running. Start `llama-server` first, or switch `--model` to an Ollama/cloud ID.
 
-**No API key env var warning** — pi expects *some* key even for local providers. Export `LLAMACPP_API_KEY=noop` (or `OLLAMA_API_KEY=noop`) before launching.
+**No API key env var warning** — pi expects *some* key even for local/OpenAI-compatible providers. Export `LLAMACPP_API_KEY=noop`, `OLLAMA_API_KEY=noop`, or `OPENAI_COMPAT_API_KEY=noop` before launching.
+
+**`Daytona requires DAYTONA_API_KEY to be set`** — Harbor's Daytona backend will exit before starting a run if the Daytona API key is missing. Export it in the shell that launches `benchmarks/harbor_pilot.sh` or `benchmarks/harbor_full.sh`.
 
 **Extension load failures on startup** — run `./node_modules/.bin/pi --list-models` with `--verbose` — extension errors surface there. Common cause: deleted `node_modules` (re-run `npm install`).
 
@@ -140,7 +147,7 @@ little-coder/
 ├── .pi/
 │   ├── settings.json               # per-model profiles + benchmark_overrides (terminal_bench, gaia)
 │   └── extensions/                 # 16 TypeScript extensions, auto-discovered by pi
-│       ├── llama-cpp-provider/     # registers llamacpp/* and ollama/* as OpenAI-compat providers
+│       ├── llama-cpp-provider/     # registers local and generic OpenAI-compat providers
 │       ├── write-guard/            # Write refuses on existing files — the whitepaper invariant
 │       ├── extra-tools/            # glob, webfetch, websearch (pi ships grep/find)
 │       ├── skill-inject/           # per-turn tool-skill selection (error > recency > intent)
@@ -166,7 +173,7 @@ little-coder/
 │   ├── aider_polyglot.py           # Polyglot driver with per-language transforms
 │   ├── tb_adapter/                 # Terminal-Bench 1.0 BaseAgent (tmux-proxy)
 │   ├── harbor_adapter/             # Terminal-Bench 2.0 BaseAgent (async env.exec proxy)
-│   ├── tb_pilot.sh / harbor_pilot.sh
+│   ├── tb_pilot.sh / harbor_pilot.sh / harbor_full.sh
 │   ├── tb_status.sh / harbor_status.sh
 │   └── test_rpc_client.py
 ├── AGENTS.md                       # project system prompt (pi discovers it automatically)

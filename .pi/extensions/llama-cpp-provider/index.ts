@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 const LLAMACPP_BASE_URL = process.env.LLAMACPP_BASE_URL || "http://127.0.0.1:8888/v1";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1";
+const OPENAI_COMPAT_BASE_URL = process.env.OPENAI_COMPAT_BASE_URL || "http://fs-mbz-gpu-257:8000/v1";
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("llamacpp", {
@@ -43,6 +44,27 @@ export default function (pi: ExtensionAPI) {
         contextWindow: 32768,
         maxTokens: 4096,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      },
+    ],
+  });
+
+  pi.registerProvider("openai-compat", {
+    baseUrl: OPENAI_COMPAT_BASE_URL,
+    apiKey: "OPENAI_COMPAT_API_KEY",
+    api: "openai-completions",
+    models: [
+      {
+        id: "qwen/qwen3.6-35b-a3b",
+        name: "Qwen3.6-35B-A3B (remote OpenAI-compatible)",
+        reasoning: true,
+        input: ["text"],
+        contextWindow: 40960,
+        maxTokens: 4096,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        compat: {
+          supportsDeveloperRole: false,
+          supportsReasoningEffort: false,
+        },
       },
     ],
   });

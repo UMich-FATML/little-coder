@@ -1,41 +1,24 @@
 #!/usr/bin/env bash
-# Pilot runner for Terminal-Bench 2.0 via harbor.
-#
-# Usage:
-#   benchmarks/harbor_pilot.sh hello-world
-#   benchmarks/harbor_pilot.sh task-a task-b
+# Full Terminal-Bench 2.0 runner via harbor.
 #
 # Env:
 #   TB_LITTLE_CODER_MODEL  — model override (default: openai-compat/qwen/qwen3.6-35b-a3b)
 #   TB_HARBOR_ENV         — harbor environment (default: daytona)
-#   TB_HARBOR_CONCURRENCY — concurrent trials (default: 1)
+#   TB_HARBOR_CONCURRENCY — concurrent trials (default: 32)
 #   TB_HARBOR_JOB_NAME    — optional Harbor job name
 #
 # Requires:
 #   - harbor installed (uv tool install harbor)
 #   - DAYTONA_API_KEY when TB_HARBOR_ENV=daytona
 #   - docker access when TB_HARBOR_ENV=docker
-#
-# Output:
-#   benchmarks/harbor_runs/<timestamp>/...
 set -euo pipefail
 
 MODEL="${TB_LITTLE_CODER_MODEL:-openai-compat/qwen/qwen3.6-35b-a3b}"
 HB_ENV="${TB_HARBOR_ENV:-daytona}"
-N_CONCURRENT="${TB_HARBOR_CONCURRENCY:-1}"
+N_CONCURRENT="${TB_HARBOR_CONCURRENCY:-32}"
 JOB_NAME="${TB_HARBOR_JOB_NAME:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$REPO_ROOT/benchmarks/harbor_runs"
-
-if [[ $# -eq 0 ]]; then
-  echo "Usage: $0 <task-id> [<task-id> ...]" >&2
-  exit 1
-fi
-
-TASK_FLAGS=()
-for t in "$@"; do
-  TASK_FLAGS+=(--include-task-name "$t")
-done
 
 export TB_LITTLE_CODER_MODEL="$MODEL"
 export LLAMACPP_API_KEY="${LLAMACPP_API_KEY:-noop}"
@@ -46,17 +29,16 @@ export OPENAI_COMPAT_API_KEY="${OPENAI_COMPAT_API_KEY:-noop}"
 echo "model:   $MODEL"
 echo "dataset: terminal-bench@2.0"
 echo "env:     $HB_ENV"
-echo "tasks:   $*"
 echo "output:  $OUT"
 echo
 
 HB_CMD=(harbor run
   --dataset terminal-bench@2.0
-  "${TASK_FLAGS[@]}"
   --env "$HB_ENV"
   --agent-import-path benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent
   --model "$MODEL"
   --jobs-dir "$OUT"
+  --n-attempts 1
   --n-concurrent "$N_CONCURRENT")
 
 if [[ -n "$JOB_NAME" ]]; then
