@@ -2,6 +2,15 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.17] — 2026-04-25
+
+### Removed — README pitch paragraph and outdated local whitepaper copy
+- README's second paragraph (the "Frontier-coding-agent ergonomics for 5–25 GB models…" pitch) — redundant with the Substack link in the next paragraph and with the more detailed coverage further down (benchmark table, Roadmap, Architecture).
+- `docs/whitepaper.md` — outdated local copy, prior version to the published Substack article. The Substack post (linked from the README and from `docs/architecture.md`) is the canonical version.
+- Corresponding `whitepaper.md` entry in the README's Architecture file-tree.
+
+No code change. Tests unchanged.
+
 ## [v0.1.16] — 2026-04-24
 
 ### Added — `browser-extract-retention` extension
