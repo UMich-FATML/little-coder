@@ -110,6 +110,16 @@ class PiRpc:
         # handles execution-level blocking for defense in depth.
         if allowed_tools:
             cmd.extend(["--tools", ",".join(allowed_tools)])
+        # Use AGENTS.md as THE system prompt, not as appended Project Context.
+        # Pi's --system-prompt resolves an existing path to file content
+        # (resource-loader.js::resolvePromptInput). --no-context-files prevents
+        # AGENTS.md from also being auto-discovered and double-appended under
+        # `# Project Context`. Effect: pi's hardcoded "You are an expert coding
+        # assistant operating inside pi…" identity and the "Pi documentation"
+        # block both go away; AGENTS.md alone defines the agent.
+        agents_md = REPO_ROOT / "AGENTS.md"
+        if agents_md.exists():
+            cmd.extend(["--no-context-files", "--system-prompt", str(agents_md)])
         self._proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,

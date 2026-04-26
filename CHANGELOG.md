@@ -2,6 +2,25 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.22] — 2026-04-26
+
+### Changed — `AGENTS.md` is now THE system prompt (not appended `# Project Context`)
+Until now, every benchmark trial saw pi's hardcoded base prompt — `You are an expert coding assistant operating inside pi…` — followed by a long `Pi documentation (read only when the user asks about pi itself…)` block, *then* AGENTS.md appended underneath as `# Project Context / ## AGENTS.md`. Two identity lines back-to-back ("expert coding assistant" + "you are little-coder") and a docs block irrelevant to TB / Polyglot / GAIA tasks.
+
+`benchmarks/rpc_client.py` (`PiRpc.__init__`) now spawns pi with **`--no-context-files --system-prompt <repo>/AGENTS.md`**, leveraging two pi mechanisms:
+
+- **`--system-prompt <path>`** — pi's `resource-loader.js::resolvePromptInput` resolves an existing path to its file contents and uses that as `customPrompt`, which `system-prompt.js::buildSystemPrompt` then uses *instead of* the built-in base prompt.
+- **`--no-context-files`** — disables auto-discovery of AGENTS.md / CLAUDE.md as project-context files, which would otherwise re-append AGENTS.md under the `# Project Context` wrapper a second time.
+
+Result: pi's `You are an expert coding assistant…` opener is gone. The Pi documentation block is gone. AGENTS.md is the single, primary system prompt. The skill-inject `## Tool Usage Guidance` and knowledge-inject `## Algorithm Reference` extension blocks still append per agent-start, and pi's `Current date:` / `Current working directory:` tail still appends — those are useful and benign.
+
+This affects every benchmark that uses `PiRpc` (Aider Polyglot, TB 1.0, TB 2.0, GAIA — they all share `benchmarks/rpc_client.py`). For interactive `pi` use outside the benchmark harness, pi's default behavior is unchanged unless the user passes `--system-prompt AGENTS.md --no-context-files` themselves.
+
+### Action: stopped v0.1.21 run, restarted as v0.1.22
+The `tb2-leaderboard-k5-v0.1.21-2026-04-26__15-00-24` run was killed mid-flight (early progress, prompt-architecture change made the run no longer comparable). Archived to `archived-partial-runs/`. A fresh `tb2-leaderboard-k5-v0.1.22-*` run starts immediately on the new prompt-architecture.
+
+No AGENTS.md content change in this release — only the spawn flags change in `rpc_client.py`. Tests unchanged.
+
 ## [v0.1.21] — 2026-04-26
 
 ### Restored — three operational rules dropped by the v0.1.20 dedup
