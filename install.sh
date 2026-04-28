@@ -33,7 +33,7 @@ say "Node $NODE_V detected."
 say "Installing little-coder globally via npm..."
 if npm install -g little-coder; then
   say "Installed."
-  say "Run:    cd ~/your-project && little-coder --model anthropic/claude-haiku-4-5"
+  say "Run:    cd ~/your-project && little-coder --model llamacpp/qwen3.6-35b-a3b"
   say "Models: little-coder --list-models"
 else
   err "Install failed."

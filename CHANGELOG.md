@@ -2,6 +2,13 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v1.0.3] — 2026-04-28
+
+### Changed
+- README and `install.sh` now lead with `little-coder --model llamacpp/qwen3.6-35b-a3b` as the canonical example. That's the configuration little-coder is tuned for: small local model + custom scaffolding. Cloud models (Anthropic, OpenAI) move into the secondary list.
+
+---
+
 ## [v1.0.2] — 2026-04-28
 
 ### Changed

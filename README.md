@@ -32,14 +32,16 @@ That's the whole install. No clone, no `npm install` in a workspace, no PATH fid
 
 ```bash
 cd ~/your-project
-little-coder --model anthropic/claude-haiku-4-5
+little-coder --model llamacpp/qwen3.6-35b-a3b
 ```
 
-Other models work the same way:
+This is the canonical setup little-coder is tuned for: a local llama.cpp server hosting Qwen3.6-35B-A3B. See **[Local model setup (optional)](#local-model-setup-optional)** below for how to serve it.
+
+Cloud models work the same way:
 
 ```bash
+little-coder --model anthropic/claude-haiku-4-5
 little-coder --model openai/gpt-4o-mini "What does this codebase do?"
-little-coder --model llamacpp/qwen3.6-35b-a3b   # local llama.cpp server
 little-coder --model ollama/qwen3.5             # local Ollama
 little-coder --list-models                      # see everything pi knows about
 ```
@@ -145,7 +147,7 @@ git clone https://github.com/itayinbarr/little-coder.git
 cd little-coder
 npm install
 npm link            # makes the local checkout available as `little-coder`
-little-coder --model anthropic/claude-haiku-4-5
+little-coder --model llamacpp/qwen3.6-35b-a3b
 ```
 
 To unlink: `npm unlink -g little-coder`.
