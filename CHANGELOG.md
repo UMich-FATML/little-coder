@@ -2,6 +2,57 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.27] — 2026-04-28
+
+### GAIA validation-set result — **40.00 %** (66 / 165) on Qwen3.6-35B-A3B
+
+First end-to-end run on GAIA, the agent-research benchmark from Mialon et al. (2023). 165-task validation set, scored locally with the GAIA-faithful scorer in `benchmarks/gaia_scorer.py`.
+
+| Level | Pass | Count | Rate |
+|---|---|---|---|
+| L1 | 32 | 53 | 60.4 % |
+| L2 | 32 | 86 | 37.2 % |
+| L3 | 2 | 26 | 7.7 % |
+| **Total** | **66** | **165** | **40.00 %** |
+
+Same hardware as the prior runs: Qwen3.6-35B-A3B (UD-Q4_K_M, ~22 GB MoE) via `llama-server`, single RTX 5070 Laptop with 8 GB VRAM, expert weights kept in CPU RAM via `--n-cpu-moe 999`. Fully local, no cloud inference. The leaderboard submission (test split, 301 tasks) will follow as a separate release.
+
+### Added — `benchmarks/gaia.py` (per-task GAIA runner)
+Drives `pi --mode rpc` per task via the existing `PiRpc`. Loads the gated `gaia-benchmark/GAIA` parquet directly, stages any per-task attachment file into pi's cwd, and writes a leaderboard-shaped `submission.jsonl` plus per-task `transcript.txt` / `tool_calls.jsonl` / `notifications.txt` / `result.json` for post-hoc analysis. Resumable via `--resume` — long runs that get interrupted pick up from the most recent per-task `result.json`.
+
+GAIA-shaped tool allow-list (`Read`, `Bash`, `Grep`, `Glob`, `WebFetch`, `WebSearch`, the full `Browser*` family, the `Evidence*` family — no `Write` / `Edit`, GAIA tasks aren't authoring code) is wired through `LITTLE_CODER_ALLOWED_TOOLS` and pi's `--tools` filter.
+
+### Added — `benchmarks/gaia_validate_submission.py` (pre-upload validator)
+Mirrors the server-side checks in `gaia-benchmark/leaderboard/app.py::add_new_eval`: per-line JSON, `task_id` / `model_answer` keys, no duplicates, exact level counts (93 L1 / 159 L2 / 49 L3 for test, 53 / 86 / 26 for validation). On `--split validation --score`, also runs `gaia_scorer.score()` to compute the local expected number — produces the 66 / 165 figure above.
+
+### Added — `benchmarks/gaia_status.sh` (live run readout)
+GAIA-shaped counterpart to `tb_status.sh`. Reads each `<run>/<task_id>/result.json` + per-task `notifications.txt` + `tool_calls.jsonl`. Reports overall and per-level accuracy, per-task rate, ETA, tool-call breakdown, and aggregate extension activity (skill-inject, research-directive, finalize-warn, quality-monitor, turn-cap, etc.).
+
+### Added — `.pi/extensions/finalize-warn`
+New extension. Fires once per agent run at turn `(max_turns - 5 + 1)`, sending the model a follow-up user message reminding it to emit `Answer: <value>` before the cap aborts. Pi's `sendUserMessage(..., {deliverAs:"followUp"})` queues for the next user turn, so firing 5 turns before the cap (rather than 1 or 2) leaves the model real headroom after the message lands. Independent extension by design — the abort policy in `turn-cap` and the warn policy stay decoupled.
+
+### Added — research-first directive in `skill-inject`
+When the user prompt contains research-shaped keywords (`browse`, `online`, `research(ing)`, `look up`, `wikipedia`, `cite`, `citation`, `fact-check`, `google`, `webpage`, `website`, `search the / search for`, `web search`), `skill-inject` appends a `## Research-first directive` block at the end of the system prompt. The directive tells the agent to gather evidence via Browser + EvidenceAdd before producing a final answer, and to never go straight to Edit/Write or guess from memory. Placed last in the system prompt by design — small models show strong recency bias, and the per-task instruction is what we want freshest in their attention. Detected via a `looksLikeResearchTask()` regex set; benchmark-agnostic.
+
+`skill-inject`'s INTENT_MAP also gained entries for research / browser / evidence keywords (`research`, `wikipedia`, `article`, `citation`, `cite`, `source`, `fact`, `factcheck`, `navigate`, `browse`, `page`, `click`) → BrowserNavigate / BrowserExtract / EvidenceAdd skill cards. Without these entries, on the opening turn of a research task the wrong skill cards (code-edit) could win the skill-token budget by intent-matching against incidental words.
+
+### Added — `requiredTools` per benchmark in `benchmark-profiles`
+`.pi/extensions/benchmark-profiles/index.ts` now publishes `requiredTools` on `systemPromptOptions.littleCoder` when `LITTLE_CODER_BENCHMARK` is set. For GAIA: `["BrowserNavigate", "BrowserExtract", "EvidenceAdd"]`. `skill-inject` reads this list and pre-seeds those tool names into its recency window, ensuring those skill cards are eligible for injection on turn 1 even before the agent has used them.
+
+### Fixed — `skill-inject` allow-list filter race
+Pi runs `before_agent_start` handlers in extension load order (alphabetical). `skill-inject` fires before `tool-gating`, so `lc.allowedTools` was undefined on the first turn, and skill cards for tools not in the benchmark's allow-list could win the skill-token budget. `skill-inject` now also reads `LITTLE_CODER_ALLOWED_TOOLS` directly as a fallback, so the filter is in effect from turn 1.
+
+### Settings — GAIA `max_turns` 30 → 40
+`.pi/settings.json` `little_coder.model_profiles.<model>.benchmark_overrides.gaia.max_turns` raised to 40 (both registered Qwen profiles). Matches the headroom needed for L2/L3 multi-hop research tasks.
+
+### `.gitignore`
+`benchmarks/gaia_runs/` added to the ignore list — per-run artifacts (transcripts, tool-call JSONLs, submission files) stay local and never enter git.
+
+### Roadmap
+Roadmap item 4 advances from *next* to **validation done — 40.00 %**. Test-split run + leaderboard submission to follow as a separate release.
+
+No changes to existing extensions outside the additions above. Tests: 14 → 14 (no test deltas in the existing suite). All run on a consumer laptop, no cloud inference.
+
 ## [v0.1.26] — 2026-04-27
 
 ### Submitted — Terminal-Bench 2.0 leaderboard, PR #163 (Qwen3.5-9B at 9.21 %)

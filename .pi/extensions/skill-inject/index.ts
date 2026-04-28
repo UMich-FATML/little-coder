@@ -25,7 +25,7 @@ let loaded = false;
 const recentToolCalls: string[] = []; // most-recent-first, capped at 8
 let lastFailedTool: string | null = null;
 
-// ── Intent keywords → likely tools (exact port of _INTENT_MAP) ──────────
+// ── Intent keywords → likely tools ──────────────────────────────────────
 const INTENT_MAP: Record<string, string[]> = {
   read: ["Read"], show: ["Read"], view: ["Read"], cat: ["Read"],
   write: ["Write"], create: ["Write", "Bash"],
@@ -40,6 +40,22 @@ const INTENT_MAP: Record<string, string[]> = {
   grep: ["Grep"], glob: ["Glob"],
   fetch: ["WebFetch"], download: ["WebFetch"], url: ["WebFetch"],
   web: ["WebSearch"],
+  // Research / browser / evidence
+  research: ["BrowserNavigate", "BrowserExtract", "EvidenceAdd"],
+  researching: ["BrowserNavigate", "BrowserExtract", "EvidenceAdd"],
+  wikipedia: ["BrowserNavigate", "BrowserExtract", "EvidenceAdd"],
+  article: ["BrowserNavigate", "BrowserExtract", "EvidenceAdd"],
+  citation: ["EvidenceAdd", "BrowserExtract"],
+  cite: ["EvidenceAdd"],
+  source: ["EvidenceAdd", "BrowserExtract"],
+  fact: ["EvidenceAdd"],
+  factcheck: ["EvidenceAdd", "BrowserExtract"],
+  question: ["EvidenceAdd", "BrowserExtract"],
+  answer: ["EvidenceAdd", "EvidenceList"],
+  navigate: ["BrowserNavigate"],
+  browse: ["BrowserNavigate", "BrowserExtract"],
+  page: ["BrowserExtract"],
+  click: ["BrowserClick"],
   agent: ["Agent"], delegate: ["Agent"], spawn: ["Agent"],
 };
 
@@ -115,6 +131,45 @@ function buildBlock(selected: ToolSkill[]): string {
   return out;
 }
 
+// Keyword-triggered directive: when the user's prompt smells like a
+// research / web-lookup task, prepend an explicit "browse-first, then
+// edit-write" rule. Without it, qwen-class small models often skip
+// straight to Edit/Write on free-form questions, never gathering evidence.
+const RESEARCH_TRIGGERS = [
+  /\bbrows(?:e|ing|er)\b/i,
+  /\bonline\b/i,
+  /\bresearch(?:ing)?\b/i,
+  /\blook\s+up\b/i,
+  /\blookup\b/i,
+  /\bsearch\s+(?:the|for)\b/i,
+  /\bweb\s*search\b/i,
+  /\bwikipedia\b/i,
+  /\bwebsite\b/i,
+  /\bweb\s*page\b/i,
+  /\bgoogle\b/i,
+  /\bcite|citation\b/i,
+  /\bfact[-\s]?check/i,
+];
+
+function looksLikeResearchTask(text: string): boolean {
+  if (!text) return false;
+  for (const re of RESEARCH_TRIGGERS) {
+    if (re.test(text)) return true;
+  }
+  return false;
+}
+
+const RESEARCH_DIRECTIVE = [
+  "",
+  "## Research-first directive",
+  "This task involves online research. Before producing a final answer:",
+  "1. Use BrowserNavigate / BrowserExtract (or WebSearch for first hops) to gather facts.",
+  "2. Save each citable fact via EvidenceAdd before relying on it.",
+  "3. Only after evidence is in place should you consider any Edit/Write tool calls.",
+  "Skipping the gather step (going straight to Edit/Write or guessing from memory) is wrong — restart with the browse step instead.",
+  "",
+].join("\n");
+
 export default function (pi: ExtensionAPI) {
   // Track tool usage across the whole session so recency + error-recovery
   // state is available on the next before_agent_start.
@@ -140,37 +195,62 @@ export default function (pi: ExtensionAPI) {
     const budget: number = lc.skillTokenBudget ?? 300;
     if (budget <= 0) return;
 
-    const allowedList: string[] | undefined = lc.allowedTools;
-    const allowed = allowedList ? new Set(allowedList) : undefined;
+    // Allow-list source: prefer systemPromptOptions (set by tool-gating's
+    // before_agent_start), but fall back to LITTLE_CODER_ALLOWED_TOOLS env
+    // directly. Pi runs before_agent_start handlers in extension load order
+    // (alphabetical), so skill-inject fires before tool-gating and
+    // lc.allowedTools is undefined on the first turn unless we read env here.
+    let allowedList: string[] | undefined = lc.allowedTools;
+    if (!allowedList && process.env.LITTLE_CODER_ALLOWED_TOOLS) {
+      allowedList = process.env.LITTLE_CODER_ALLOWED_TOOLS
+        .split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    const allowed = allowedList && allowedList.length > 0 ? new Set(allowedList) : undefined;
 
     // Knowledge-inject may publish required_tools on systemPromptOptions —
     // pre-add those before selecting so they win even when budget is tight.
+    // Benchmark profiles can also publish requiredTools (e.g. GAIA -> Browser+Evidence).
     const preferred: string[] = Array.isArray(lc.requiredTools) ? lc.requiredTools : [];
     for (const t of preferred) {
       if (!recentToolCalls.includes(t)) recentToolCalls.unshift(t);
     }
 
     const selected = selectSkills(event.prompt ?? "", budget, allowed);
-    if (selected.length === 0) return;
+    const researchTask = looksLikeResearchTask(event.prompt ?? "");
 
-    const key = selected.map((s) => s.targetTool).sort().join("|");
-    let block = selectionCache.get(key);
-    if (block === undefined) {
-      block = buildBlock(selected);
-      selectionCache.set(key, block);
-    }
+    if (selected.length === 0 && !researchTask) return;
+
+    const skillBlock = selected.length > 0
+      ? (() => {
+          const key = selected.map((s) => s.targetTool).sort().join("|");
+          let b = selectionCache.get(key);
+          if (b === undefined) {
+            b = buildBlock(selected);
+            selectionCache.set(key, b);
+          }
+          return b;
+        })()
+      : "";
+
+    const directive = researchTask ? RESEARCH_DIRECTIVE : "";
 
     // Fire-and-forget notify so the benchmark harness can count per-turn
     // skill injections without having to reconstruct the system prompt.
     try {
-      ctx.ui.notify(
-        `skill-inject: +${selected.length} [${selected.map((s) => s.targetTool).join(",")}]`,
-        "info",
-      );
+      const parts: string[] = [];
+      if (selected.length > 0) {
+        parts.push(`+${selected.length} [${selected.map((s) => s.targetTool).join(",")}]`);
+      }
+      if (researchTask) parts.push("+research-directive");
+      ctx.ui.notify(`skill-inject: ${parts.join(" ")}`, "info");
     } catch {
       // UI unavailable in some run modes — silent best-effort
     }
 
-    return { systemPrompt: (event.systemPrompt ?? "") + block };
+    // Order: [AGENTS.md] [tool skill cards] [research directive].
+    // The directive is the LAST block in the system prompt by design —
+    // small models show strong recency bias and the per-task instruction
+    // is exactly what we want freshest in their attention.
+    return { systemPrompt: (event.systemPrompt ?? "") + skillBlock + directive };
   });
 }

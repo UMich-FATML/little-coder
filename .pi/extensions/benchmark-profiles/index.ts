@@ -86,8 +86,18 @@ function resolveProfile(providerSlashModel: string): ModelProfile {
   return basePlain;
 }
 
+// Per-benchmark tools that should always have skill cards present on turn 1,
+// even before the agent has used them. Without this, skill-inject relies on
+// recency / error-recovery / intent-matching, none of which fire on the
+// opening turn — and the wrong skills (Edit/Write) can win the budget on a
+// pure research question.
+const BENCHMARK_REQUIRED_TOOLS: Record<string, string[]> = {
+  gaia: ["BrowserNavigate", "BrowserExtract", "EvidenceAdd"],
+};
+
 function toLittleCoderOptions(p: ModelProfile): Record<string, unknown> {
-  return {
+  const benchmark = process.env.LITTLE_CODER_BENCHMARK;
+  const out: Record<string, unknown> = {
     contextLimit: p.context_limit,
     maxTokens: p.max_tokens,
     thinkingBudget: p.thinking_budget,
@@ -98,8 +108,12 @@ function toLittleCoderOptions(p: ModelProfile): Record<string, unknown> {
     temperature: p.temperature,
     maxTurns: p.max_turns,
     preferTextTools: p.prefer_text_tools,
-    benchmark: process.env.LITTLE_CODER_BENCHMARK,
+    benchmark,
   };
+  if (benchmark && BENCHMARK_REQUIRED_TOOLS[benchmark]) {
+    out.requiredTools = BENCHMARK_REQUIRED_TOOLS[benchmark];
+  }
+  return out;
 }
 
 export default function (pi: ExtensionAPI) {
