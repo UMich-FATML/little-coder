@@ -12,7 +12,7 @@ jobs:
     name: Publish on tag
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write   # required to create the GitHub Release
       id-token: write   # required for npm provenance via GitHub OIDC
     steps:
       - uses: actions/checkout@v4
@@ -42,3 +42,48 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Extract CHANGELOG section for this version
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # Pull lines between "## [vX.Y.Z]" and the next "## [" header,
+          # then trim trailing "---" separators / blank lines that
+          # Keep-a-Changelog uses between sections.
+          awk -v ver="$version" '
+            $0 ~ "^## \\[v" ver "\\]" { flag=1; next }
+            flag && /^## \[/          { exit }
+            flag                       { n++; lines[n] = $0 }
+            END {
+              while (n > 0 && (lines[n] == "---" || lines[n] ~ /^[[:space:]]*$/)) n--
+              for (i = 1; i <= n; i++) print lines[i]
+            }
+          ' CHANGELOG.md > /tmp/release-notes.md
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "::warning::No CHANGELOG section found for v$version — falling back to auto-generated notes"
+            echo "fallback=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fallback=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release (with CHANGELOG notes)
+        if: steps.notes.outputs.fallback == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file /tmp/release-notes.md \
+            --latest \
+            --verify-tag
+
+      - name: Create GitHub Release (auto-generated fallback)
+        if: steps.notes.outputs.fallback == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --latest \
+            --verify-tag
