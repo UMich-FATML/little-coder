@@ -2,6 +2,30 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v1.1.0] — 2026-05-03
+
+Issue-cleanup release. Three small features and one bug fix, driven by GitHub issues #12 / #13 / #15 / #16.
+
+### Added
+- **`models.json` is now the canonical provider registration.** ([#13](https://github.com/itayinbarr/little-coder/issues/13))
+  Previously `.pi/extensions/llama-cpp-provider/index.ts` hardcoded the model list and `models.json` was decorative; editing it had no effect. Now the extension loads providers and models from `models.json` at startup and registers them dynamically. **User override file** (first match wins): `$LITTLE_CODER_MODELS_FILE` → `$XDG_CONFIG_HOME/little-coder/models.json` → `~/.config/little-coder/models.json`. Per-provider replace semantics — your override fully replaces a same-keyed provider in the shipped file. Diagnostics for missing/invalid sources surface via `console.error`. The legacy `LLAMACPP_BASE_URL` / `OLLAMA_BASE_URL` env vars still beat both files for those two providers. New unit-test module `.pi/extensions/llama-cpp-provider/config.test.ts` covers merge, env override, and resolution-order semantics. README has a new **Configuring models** section.
+- **`LITTLE_CODER_BASH_ALLOW` env var** ([#15](https://github.com/itayinbarr/little-coder/issues/15)) — comma-separated extra prefixes merged with the built-in `permission-gate` whitelist, so deployments can allow extra bash commands without forking. Trailing whitespace is meaningful (acts as a word boundary, matching the built-in convention). README has a new **Permissions** section that also documents the existing `LITTLE_CODER_PERMISSION_MODE=accept-all` escape hatch (which was undocumented before).
+- **`bun add -g little-coder` install path documented** ([#12](https://github.com/itayinbarr/little-coder/issues/12)). Node ≥ 20.6 is still required at runtime because of the launcher shebang; users who want a fully node-less setup get a one-line shebang-swap recipe.
+- `qwen3.6-27b` re-added to `models.json` so the data-driven extension preserves the four-model lineup (`llamacpp/qwen3.6-27b`, `llamacpp/qwen3.6-35b-a3b`, `llamacpp/qwen3.5-9b`, `ollama/qwen3.5`) that `.pi/settings.json` profiles already reference.
+
+### Fixed
+- **Empty-response correction is no longer parked until the next user input.** ([#16](https://github.com/itayinbarr/little-coder/issues/16))
+  `quality-monitor` was sending its correction message via `pi.sendUserMessage(..., { deliverAs: "followUp" })`, which queued the message until the user typed something — by which point "your previous response was empty" had nothing to steer. Switched to `deliverAs: "steer"` so the correction injects into the in-flight loop. Same fix applies to the other quality-monitor reasons (`unknown_tool`, `repeated_tool_call`, `malformed_args`, `empty_tool_name`); they all benefit from prompt delivery for the same reason. The `thinking-budget` extension's deliberate use of `followUp` (post-abort retry; see commit `50becc3`) is unchanged.
+
+### Changed
+- README architecture diagram: `llama-cpp-provider/` is now described as "data-driven provider registration from models.json (+ user override file)"; `models.json` is now described as "canonical provider registration", reflecting the actual load path.
+
+### Notes for upgraders
+- No CLI flag, settings.json, or skill-pack breaks. Existing `.pi/settings.json` `model_profiles` keys (`llamacpp/qwen3.6-27b`, `llamacpp/qwen3.6-35b-a3b`, `llamacpp/qwen3.5-9b`, `ollama/qwen3.5`) all still match.
+- If you'd been editing the installed package's `models.json` manually, those edits will keep working — but they're erased on the next `npm install -g little-coder@latest`. Move them to `~/.config/little-coder/models.json` to make them survive upgrades.
+
+---
+
 ## [v1.0.3] — 2026-04-28
 
 ### Changed

@@ -5,8 +5,13 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 // "accept-all" mode all commands pass (benchmark runs set this explicitly).
 // Write/Edit confirmations are deferred to the TUI's own prompt; we simply
 // add an extra guardrail on bash here to match little-coder's behavior.
+//
+// Per-deployment customization (issue #15):
+//   LITTLE_CODER_PERMISSION_MODE=auto|accept-all|manual
+//   LITTLE_CODER_BASH_ALLOW="cmd1,cmd2 sub,..."  extra allow-prefixes,
+//                                                merged with the built-in list.
 
-const SAFE_PREFIXES: readonly string[] = [
+const BUILTIN_SAFE_PREFIXES: readonly string[] = [
   "ls", "cat", "head", "tail", "wc", "pwd", "echo", "printf", "date",
   "which", "type", "env", "printenv", "uname", "whoami", "id",
   "git log", "git status", "git diff", "git show", "git branch",
@@ -18,9 +23,25 @@ const SAFE_PREFIXES: readonly string[] = [
   "curl -I", "curl --head",
 ];
 
-export function isSafeBash(command: string): boolean {
+// Trailing whitespace is meaningful — it acts as a word boundary in startsWith
+// matching ("find " refuses "findbug"). We only strip leading whitespace so
+// callers retain control over that boundary.
+export function parseExtraPrefixes(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trimStart())
+    .map((s) => (s.length > 0 && s !== " ".repeat(s.length) ? s : ""))
+    .filter((s) => s.length > 0);
+}
+
+export function getSafePrefixes(): string[] {
+  return [...BUILTIN_SAFE_PREFIXES, ...parseExtraPrefixes(process.env.LITTLE_CODER_BASH_ALLOW)];
+}
+
+export function isSafeBash(command: string, prefixes: readonly string[] = getSafePrefixes()): boolean {
   const c = command.trim();
-  return SAFE_PREFIXES.some((p) => c.startsWith(p));
+  return prefixes.some((p) => c.startsWith(p));
 }
 
 function getPermissionMode(): "auto" | "accept-all" | "manual" {

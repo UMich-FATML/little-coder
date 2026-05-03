@@ -26,7 +26,15 @@ Or with npm directly:
 npm install -g little-coder
 ```
 
+Or with [bun](https://bun.sh):
+
+```bash
+bun add -g little-coder
+```
+
 That's the whole install. No clone, no `npm install` in a workspace, no PATH fiddling. `little-coder` is now on your PATH and works from any directory.
+
+> **Note for `bun add -g` users.** The launcher (`bin/little-coder.mjs`) is a Node.js script with `#!/usr/bin/env node` at the top, so Node ≥ 20.6 still has to be on your PATH for the binary to start — bun is fine for installing/updating the package, but the runtime is Node. If you want a fully node-less setup, replace the shebang in `$(bun pm bin -g)/little-coder` with `#!/usr/bin/env bun`.
 
 ## Run
 
@@ -90,6 +98,76 @@ ollama pull qwen3.5        # 9.7B — the paper's model
 ```
 
 All small-model-specific extensions auto-disable for large/cloud models so they don't interfere.
+
+---
+
+## Configuring models
+
+The shipped model list lives in **`models.json`** at the package root. The `llama-cpp-provider` extension reads it at startup and registers each provider via pi's `registerProvider()`. Editing this file in your global install **does** take effect — but it's overwritten on `npm install -g little-coder@latest`, so for anything you want to keep, use a user override file instead.
+
+User override resolution (first match wins):
+
+1. `$LITTLE_CODER_MODELS_FILE` — explicit path, useful for ad-hoc tests.
+2. `$XDG_CONFIG_HOME/little-coder/models.json`
+3. `~/.config/little-coder/models.json`
+
+Merge semantics: each top-level provider key in your override file **fully replaces** the same key in the shipped `models.json`. Providers only in your file are added; providers only in the shipped file are kept. (We don't deep-merge per-model fields — you redeclare the whole provider entry, which avoids "your override silently inherited new fields from a future package release" surprises.)
+
+Example — switch the llama.cpp port and bump `qwen3.6-35b-a3b` to a 150K context, leave ollama untouched:
+
+```json
+{
+  "providers": {
+    "llamacpp": {
+      "api": "openai-completions",
+      "baseUrl": "http://127.0.0.1:1234/v1",
+      "apiKey": "LLAMACPP_API_KEY",
+      "models": [
+        {
+          "id": "qwen3.6-35b-a3b",
+          "name": "Qwen3.6-35B-A3B (local llama.cpp, 150K)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 150000,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}
+```
+
+Then verify with `little-coder --list-models` — you should see your overridden entry.
+
+`LLAMACPP_BASE_URL` and `OLLAMA_BASE_URL` env vars still beat both files for those two providers (legacy compat).
+
+`.pi/settings.json` is a separate concern: it controls per-model **profiles** (context_limit, thinking_budget, temperature, benchmark_overrides) referenced by the `<provider>/<id>` key. Profiles don't register or describe models — they only tune how little-coder runs against models that are already registered.
+
+---
+
+## Permissions
+
+little-coder gates `Bash` tool calls against a built-in safe-prefix whitelist (`ls`, `cat`, `git log/status/diff`, `find`, `grep`, etc.) before pi's own confirmation flow ever sees them.
+
+Two env vars control the gate:
+
+| Env var | Values | Effect |
+|---|---|---|
+| `LITTLE_CODER_PERMISSION_MODE` | `auto` *(default)* / `accept-all` / `manual` | `auto`: block any bash command not on the whitelist. `accept-all`: skip the gate entirely, every bash call passes (the benchmark runner sets this). `manual`: same as `auto` but with a different rejection message. |
+| `LITTLE_CODER_BASH_ALLOW` | comma-separated prefixes | Extra allow-prefixes merged with the built-in list. **Trailing whitespace is meaningful**: `"make "` allows `make test` but not `makefoo`; `"make"` allows both. |
+
+Examples:
+
+```bash
+# Add 'make' (with word-boundary) and 'docker compose ps' on top of the defaults
+export LITTLE_CODER_BASH_ALLOW="make ,docker compose ps"
+
+# Skip the gate entirely (use this only inside controlled environments)
+export LITTLE_CODER_PERMISSION_MODE=accept-all
+```
+
+Write/Edit confirmations are pi's responsibility; little-coder doesn't intercept those.
 
 ---
 
@@ -163,7 +241,7 @@ little-coder/
 ├── .pi/
 │   ├── settings.json               # per-model profiles + benchmark_overrides (terminal_bench, gaia)
 │   └── extensions/                 # 20 TypeScript extensions, auto-discovered by pi
-│       ├── llama-cpp-provider/     # registers llamacpp/* and ollama/* as OpenAI-compat providers
+│       ├── llama-cpp-provider/     # data-driven provider registration from models.json (+ user override file)
 │       ├── write-guard/            # Write refuses on existing files — the whitepaper invariant
 │       ├── extra-tools/            # glob, webfetch, websearch (pi ships grep/find)
 │       ├── skill-inject/           # per-turn tool-skill selection (error > recency > intent)
@@ -193,7 +271,7 @@ little-coder/
 │   ├── tb_status.sh / harbor_status.sh
 │   └── test_rpc_client.py
 ├── AGENTS.md                       # project system prompt (pi discovers it automatically)
-├── models.json                     # documented provider registration (extension is canonical)
+├── models.json                     # canonical provider registration (loaded by llama-cpp-provider; user override at $XDG_CONFIG_HOME/little-coder/models.json)
 └── docs/
     ├── benchmark-*.md              # per-benchmark narratives
     └── architecture.md             # v0.0.5-era Python architecture (historical)

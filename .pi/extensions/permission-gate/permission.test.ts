@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSafeBash } from "./index.ts";
+import { isSafeBash, parseExtraPrefixes, getSafePrefixes } from "./index.ts";
 
 describe("isSafeBash", () => {
   it("allows whitelisted read-only commands", () => {
@@ -22,5 +22,46 @@ describe("isSafeBash", () => {
     expect(isSafeBash("git log")).toBe(true);
     expect(isSafeBash("git push origin main")).toBe(false);
     expect(isSafeBash("git commit -m x")).toBe(false);
+  });
+  it("respects an explicit prefix list (LITTLE_CODER_BASH_ALLOW shape)", () => {
+    const extra = ["make ", "docker compose ps"];
+    expect(isSafeBash("make test", extra)).toBe(true);
+    expect(isSafeBash("docker compose ps", extra)).toBe(true);
+    expect(isSafeBash("docker compose down", extra)).toBe(false);
+  });
+});
+
+describe("parseExtraPrefixes", () => {
+  it("returns empty for undefined / empty / whitespace", () => {
+    expect(parseExtraPrefixes(undefined)).toEqual([]);
+    expect(parseExtraPrefixes("")).toEqual([]);
+    expect(parseExtraPrefixes("   ")).toEqual([]);
+  });
+  it("splits on comma and trims leading whitespace, preserving trailing space as word boundary", () => {
+    expect(parseExtraPrefixes("make , docker compose ps,  bun run")).toEqual([
+      "make ",
+      "docker compose ps",
+      "bun run",
+    ]);
+  });
+  it("drops empty / whitespace-only segments", () => {
+    expect(parseExtraPrefixes("a,,b,")).toEqual(["a", "b"]);
+    expect(parseExtraPrefixes("a,   ,b")).toEqual(["a", "b"]);
+  });
+});
+
+describe("getSafePrefixes", () => {
+  it("merges builtins with LITTLE_CODER_BASH_ALLOW from the env", () => {
+    const prev = process.env.LITTLE_CODER_BASH_ALLOW;
+    process.env.LITTLE_CODER_BASH_ALLOW = "make ,docker compose ps";
+    try {
+      const all = getSafePrefixes();
+      expect(all).toContain("ls"); // builtin still present
+      expect(all).toContain("make ");
+      expect(all).toContain("docker compose ps");
+    } finally {
+      if (prev === undefined) delete process.env.LITTLE_CODER_BASH_ALLOW;
+      else process.env.LITTLE_CODER_BASH_ALLOW = prev;
+    }
   });
 });
