@@ -14,7 +14,7 @@ This document is the reproduction path for the Terminal-Bench 2.0 leaderboard ru
 | Model | `Qwen/Qwen3.6-35B-A3B` served by vLLM |
 | little-coder model id | `llamacpp/qwen/qwen3.6-35b-a3b` |
 | Adapter | `benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent` |
-| Concurrency | `--n-concurrent 1` |
+| Concurrency | `--n-concurrent 10` |
 
 The `llamacpp/qwen/qwen3.6-35b-a3b` id is registered in `models.json` as the vLLM-backed Qwen3.6 MoE entry. It still lives under the `llamacpp` provider key so it can reuse the existing OpenAI-compatible local-provider path; point that provider at vLLM with `LLAMACPP_BASE_URL`.
 
@@ -38,8 +38,6 @@ If Harbor is not already in the Pixi environment:
 pixi add python pip nodejs
 pixi add --pypi harbor
 ```
-
-## Serve Qwen3.6 MoE With vLLM
 
 Then point little-coder's local OpenAI-compatible provider at vLLM:
 
@@ -66,9 +64,12 @@ pixi run harbor run \
   --model llamacpp/qwen/qwen3.6-35b-a3b \
   --jobs-dir benchmarks/harbor_runs \
   --n-attempts 5 \
-  --n-concurrent 4 \
+  --n-concurrent 10 \
+  --force-build \
   --yes
 ```
+
+`--force-build` is required on arm64 hosts. The Terminal-Bench 2.0 task metadata points at prebuilt `alexgshaw/<task>:20251031` images, which are currently amd64 images. Forcing a build makes Harbor build each task image locally from its `environment/Dockerfile`, so Docker selects native arm64 base images where available.
 
 Harbor writes the job under:
 
@@ -91,6 +92,8 @@ pixi run harbor job resume \
   --job-path benchmarks/harbor_runs/tb2-leaderboard-k5-vllm-qwen36-moe
 ```
 
+Resume uses the saved job config, so an arm64 job must have been created with `--force-build` in the original `harbor run` command.
+
 To retry only selected infrastructure errors before resuming, use Harbor's `--filter-error-type` flag. Do not filter normal failed trials for a leaderboard-comparable result.
 
 ## Pilot Run
@@ -107,12 +110,18 @@ pixi run harbor run \
   --jobs-dir benchmarks/harbor_runs \
   --n-attempts 1 \
   --n-concurrent 1 \
+  --force-build \
   --yes
 ```
 
 ## Notes
 
 - Keep one consistent little-coder checkout, prompt, model id, vLLM serving config, and Harbor config across all 445 trials. Mixing partial runs with different prompts or backends is not leaderboard-comparable.
+- On arm64, keep `--force-build` enabled for every run so Harbor does not pull the amd64 prebuilt task images.
+- The first local build for each task can be slow. Later runs on the same machine should reuse Docker/BuildKit layers unless Docker cache is pruned or the task image inputs change.
+- Harbor's default cleanup may remove final trial containers/images, but it does not normally remove Docker's build cache. Use `--no-delete` only for debugging because long runs can consume substantial disk.
+- If local builds fail with Docker Hub `429 Too Many Requests`, authenticate with `docker login` or pre-pull common base images such as `python:*`, `ubuntu:*`, and `debian:*` after the rate limit resets.
+- Some tasks may still contain architecture-specific assumptions even when their images build on arm64. Treat those as task-level compatibility issues rather than Harbor adapter failures.
 - Harbor stores each trial reward at `verifier_result.rewards.reward` in the trial `result.json`; `benchmarks/harbor_status.sh` reads that field.
 - The TB 2.0 adapter exposes only `ShellSession`, `ShellSessionCwd`, and `ShellSessionReset` to the agent. File edits inside the task container happen through shell commands proxied to Harbor's environment.
 - vLLM's default OpenAI-compatible port is 8000. The `LLAMACPP_BASE_URL` override is what makes the existing little-coder provider talk to that endpoint instead of a llama.cpp server on port 8888.

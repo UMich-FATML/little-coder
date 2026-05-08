@@ -1,0 +1,77 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 6,
+            "passed": 5,
+            "failed": 1,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1778154718.4893854,
+            "stop": 1778154731.3564556
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_run_py_file_exists",
+                "status": "passed",
+                "duration": 0.0003779069520533085,
+                "start": 1778154718.5455203,
+                "stop": 1778154718.546087,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_tasks_run_concurrently",
+                "status": "passed",
+                "duration": 3.0963758279103786,
+                "start": 1778154718.5461612,
+                "stop": 1778154721.642904,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_tasks_obey_max_concurrent",
+                "status": "passed",
+                "duration": 6.100633710040711,
+                "start": 1778154721.6433659,
+                "stop": 1778154727.7445138,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_tasks_cancel_below_max_concurrent",
+                "status": "passed",
+                "duration": 1.5353529021376744,
+                "start": 1778154727.7448106,
+                "stop": 1778154729.2806165,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_tasks_cancel_at_max_concurrent",
+                "status": "passed",
+                "duration": 1.5275194729911163,
+                "start": 1778154729.281035,
+                "stop": 1778154730.809082,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_tasks_cancel_above_max_concurrent",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 0.5353496500756592,
+                "start": 1778154730.8095114,
+                "stop": 1778154731.3562052,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_tasks_cancel_above_max_concurrent():\n        \"\"\"\n        Test that cancellation occurs and only the first two tasks are started and\n        cancelled.\n    \n        This is a common gotcha in Python because asyncio.gather doesn't properly cancel\n        existing tasks if there are still tasks in the queue.\n        \"\"\"\n        proc = subprocess.Popen(\n            [\n                \"python\",\n                \"test.py\",\n                \"--n-tasks\",\n                \"3\",\n                \"--max-concurrent\",\n                \"2\",\n            ],\n            stdout=subprocess.PIPE,\n            stderr=subprocess.PIPE,\n        )\n    \n        # Wait 500ms, then send SIGINT (KeyboardInterrupt)\n        time.sleep(0.5)\n        proc.send_signal(signal.SIGINT)\n    \n        try:\n            stdout, stderr = proc.communicate(timeout=5)\n        finally:\n            proc.kill()\n    \n        stdout = stdout.decode(\"utf-8\")\n    \n        assert stdout.count(\"Task started.\") == 2\n>       assert stdout.count(\"Cleaned up.\") == 2\nE       AssertionError: assert 0 == 2\nE        +  where 0 = <built-in method count of str object at 0xee92295fb960>('Cleaned up.')\nE        +    where <built-in method count of str object at 0xee92295fb960> = 'Task started.\\nTask started.\\n'.count\n\n/tests/test_outputs.py:172: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            }
+        ]
+    }
+}

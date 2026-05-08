@@ -39,6 +39,7 @@ echo "model:   $MODEL"
 echo "dataset: terminal-bench@2.0"
 echo "tasks:   $*"
 echo "output:  $OUT"
+echo "build:   local (--force-build)"
 echo
 
 HB_CMD=(harbor run
@@ -47,7 +48,8 @@ HB_CMD=(harbor run
   --agent-import-path benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent
   --model "$MODEL"
   --jobs-dir "$OUT"
-  --n-concurrent 1)
+  --n-concurrent 1
+  --force-build)
 
 if groups | grep -q '\bdocker\b'; then
   cd "$REPO_ROOT" && "${HB_CMD[@]}"

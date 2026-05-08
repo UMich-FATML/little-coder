@@ -1,0 +1,41 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 2,
+            "passed": 1,
+            "failed": 1,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1778154489.1691105,
+            "stop": 1778154489.5308733
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_extract_js_exists",
+                "status": "passed",
+                "duration": 0.00036132894456386566,
+                "start": 1778154489.213265,
+                "stop": 1778154489.2138271,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_output_matches_reference",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 0.30466943280771375,
+                "start": 1778154489.2139003,
+                "stop": 1778154489.5306132,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_output_matches_reference():\n        \"\"\"Test that the output of extract.js matches the reference solution\"\"\"\n        # Run the student's script to generate output\n    \n        # Write a simple C program for testing\n        with open(\"/app/new.c\", \"w\") as f:\n            f.write(\"\"\"#include<stdio.h>\n    \n    int main(int argc, char** argv) {\n      printf(\"Here are the %d arguments you requested\\\\n\", argc);\n      for (int i = 0; i < argc; i++) {\n        printf(\"Argument %d: %s\\\\n\", i, argv[i]);\n      }\n      return 0;\n    }\"\"\")\n    \n        # Compile with full paths\n        result = subprocess.run(\n            [\"gcc\", \"-o\", \"/app/new.o\", \"/app/new.c\"], capture_output=True, text=True\n        )\n        assert result.returncode == 0, f\"Compilation failed: {result.stderr}\"\n    \n        # Run extract.js on the compiled binary\n        result = subprocess.run(\n            [\"node\", \"/app/extract.js\", \"/app/new.o\"],\n            stdout=open(\"/app/out.json\", \"w\"),\n            stderr=subprocess.PIPE,\n            text=True,\n        )\n        assert result.returncode == 0, f\"extract.js execution failed: {result.stderr}\"\n    \n        # Write the reference script with correct shebang line handling\n        with open(\"/app/ref.js\", \"w\") as f:\n            f.write(REF.strip())\n    \n        result = subprocess.run(\n            [\"node\", \"/app/ref.js\", \"/app/new.o\"],\n            stdout=open(\"/app/reference.json\", \"w\"),\n            stderr=subprocess.PIPE,\n            text=True,\n        )\n        assert result.returncode == 0, f\"Reference script execution failed: {result.stderr}\"\n    \n        # Check that out.json exists\n        out_json_path = Path(\"/app/out.json\")\n        assert out_json_path.exists(), f\"File {out_json_path} does not exist\"\n    \n        # Load the reference output\n        reference_path = Path(\"/app/reference.json\")\n        assert reference_path.exists(), f\"Reference file {reference_path} does not exist\"\n    \n        # Parse both JSON files\n        with open(out_json_path, \"r\") as f:\n            out_json = json.load(f)\n    \n        with open(reference_path, \"r\") as f:\n            reference_json = json.load(f)\n    \n        # Check requirement #1: Two memory addresses never have different values\n        inconsistent_values = {}\n        for addr, value in out_json.items():\n            if addr in reference_json and reference_json[addr] != value:\n                inconsistent_values[addr] = (value, reference_json[addr])\n    \n>       assert len(inconsistent_values) == 0, (\n            f\"Found memory addresses with inconsistent values: {inconsistent_values}\"\n        )\nE       AssertionError: Found memory addresses with inconsistent values: {'1600': (31, 3573751839), '1604': (29, 3531603997), '1608': (30, 3531603998), '1612': (229, 2852127717), '1616': (225, 4181722081), '1620': (226, 2432705506), '1624': (230, 2432697318), '1628': (224, 4026532064), '1632': (0, 4182243328), '1636': (3, 3531603971), '1640': (4, 3531603972), '1644': (225, 2550136801), '1648': (236, 2550136812), '1652': (224, 4026532064), '1656': (0, 4182242304), '1660': (64, 3019898944), '1664': (228, 402653156), '1668': (192, 3596551104), '1672': (31, 3573751839), '1676': (31, 3573751839), '1680': (0, 2415919360), '1684': (0, 2432712704), '1688': (1, 2415919361), '1692': (33, 2432712737), '1696': (63, 3942645823), '1700': (192, 1409286336), '1704': (225, 4026532065), '1708': (33, 4182240289), '1712': (97, 3019898977), '1716': (240, 2852193264), '1720': (0, 3592356352), '1724': (192, 3596551104), '1728': (0, 2415919360), '1732': (0, 2432712704), '1736': (1, 2415919361), '1740': (33, 2432712737), '1744': (33, 3405774881), '1748': (34, 3548380194), '1752': (65, 2340490305), '1756': (33, 2470575137), '1760': (193, 3019899073), '1764': (226, 4026532066), '1768': (66, 4182244418), '1772': (98, 3019898978), '1776': (240, 2852258800), '1780': (0, 3592356352), '1784': (192, 3596551104), '1788': (31, 3573751839), '1792': (63, 3573752639), '1796': (253, 2847833085), '1800': (253, 2432697341), '1804': (243, 4177529843), '1808': (19, 2415919379), '1812': (96, 960512608), '1816': (64, 922747200), '1820': (224, 4026532064), '1824': (0, 4182241280), '1828': (128, 3019899008), '1832': (0, 2415919360), '1836': (0, 4181722112), '1840': (180, 2550136756), '1844': (215, 2550136791), '1848': (32, 1384120352), '1852': (96, 956318304), '1856': (243, 4181724147), '1860': (253, 2831318013), '1864': (191, 3573752767), '1868': (192, 3596551104), '1872': (95, 3573752927), '1876': (219, 402653147), '1880': (253, 2847767549), '1884': (253, 2432697341), '1888': (224, 3103793120), '1892': (225, 4177529825), '1896': (225, 3107987425), '1900': (0, 2415919104), '1904': (0, 2434777088), '1908': (175, 2550136751), '1912': (255, 3103797247), '1916': (14, 335544334), '1920': (224, 3112185824), '1924': (0, 3548246016), '1928': (225, 4181724129), '1932': (32, 2332033056), '1936': (0, 4181721088), '1940': (226, 2852127714), '1944': (225, 3107991521), '1948': (0, 2415919104), '1952': (0, 2434826240), '1956': (163, 2550136739), '1960': (224, 3107991520), '1964': (0, 285213696), '1968': (224, 3103797216), '1972': (225, 3107991521), '1976': (224, 3107987424), '1980': (63, 1795162175), '1984': (11, 1426062859), '1988': (0, 1384120320), '1992': (253, 2831383549), '1996': (192, 3596551104), '2024': (1, 131073), '2032': (72, 1701995848), '2036': (32, 1701994784), '2040': (32, 1701344288), '2044': (32, 543434016), '2048': (97, 1969713761), '2052': (109, 1953391981), '2056': (115, 1870209139), '2060': (117, 1701978229), '2064': (113, 1936029041), '2068': (116, 174351732), '2080': (65, 1969713729), '2084': (109, 1953391981), '2088': (32, 979641632), '2092': (32, 175318304), '131080': (8, 131080)}\nE       assert 116 == 0\nE        +  where 116 = len({'131080': (8, 131080), '1600': (31, 3573751839), '1604': (29, 3531603997), '1608': (30, 3531603998), ...})\n\n/tests/test_outputs.py:380: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            }
+        ]
+    }
+}
