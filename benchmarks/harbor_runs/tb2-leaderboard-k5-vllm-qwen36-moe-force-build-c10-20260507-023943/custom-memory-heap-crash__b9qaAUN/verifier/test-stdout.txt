@@ -1,0 +1,409 @@
+Get:1 http://ports.ubuntu.com/ubuntu-ports noble InRelease [256 kB]
+Get:2 http://ports.ubuntu.com/ubuntu-ports noble-updates InRelease [126 kB]
+Get:3 http://ports.ubuntu.com/ubuntu-ports noble-backports InRelease [126 kB]
+Get:4 http://ports.ubuntu.com/ubuntu-ports noble-security InRelease [126 kB]
+Get:5 http://ports.ubuntu.com/ubuntu-ports noble/restricted arm64 Packages [113 kB]
+Get:6 http://ports.ubuntu.com/ubuntu-ports noble/universe arm64 Packages [19.0 MB]
+Get:7 http://ports.ubuntu.com/ubuntu-ports noble/multiverse arm64 Packages [274 kB]
+Get:8 http://ports.ubuntu.com/ubuntu-ports noble/main arm64 Packages [1776 kB]
+Get:9 http://ports.ubuntu.com/ubuntu-ports noble-updates/multiverse arm64 Packages [63.6 kB]
+Get:10 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 Packages [2535 kB]
+Get:11 http://ports.ubuntu.com/ubuntu-ports noble-updates/universe arm64 Packages [2115 kB]
+Get:12 http://ports.ubuntu.com/ubuntu-ports noble-updates/restricted arm64 Packages [5365 kB]
+Get:13 http://ports.ubuntu.com/ubuntu-ports noble-backports/main arm64 Packages [48.9 kB]
+Get:14 http://ports.ubuntu.com/ubuntu-ports noble-backports/universe arm64 Packages [35.9 kB]
+Get:15 http://ports.ubuntu.com/ubuntu-ports noble-backports/multiverse arm64 Packages [671 B]
+Get:16 http://ports.ubuntu.com/ubuntu-ports noble-security/universe arm64 Packages [1512 kB]
+Get:17 http://ports.ubuntu.com/ubuntu-ports noble-security/main arm64 Packages [2187 kB]
+Get:18 http://ports.ubuntu.com/ubuntu-ports noble-security/restricted arm64 Packages [5126 kB]
+Get:19 http://ports.ubuntu.com/ubuntu-ports noble-security/multiverse arm64 Packages [45.4 kB]
+Fetched 40.9 MB in 4s (11.2 MB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  libcurl4t64
+The following NEW packages will be installed:
+  curl libcurl4t64
+0 upgraded, 2 newly installed, 0 to remove and 2 not upgraded.
+Need to get 557 kB of archives.
+After this operation, 1528 kB of additional disk space will be used.
+Get:1 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 libcurl4t64 arm64 8.5.0-2ubuntu10.9 [335 kB]
+Get:2 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 curl arm64 8.5.0-2ubuntu10.9 [222 kB]
+debconf: delaying package configuration, since apt-utils is not installed
+Fetched 557 kB in 0s (1808 kB/s)
+Selecting previously unselected package libcurl4t64:arm64.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 21990 files and directories currently installed.)
+Preparing to unpack .../libcurl4t64_8.5.0-2ubuntu10.9_arm64.deb ...
+Unpacking libcurl4t64:arm64 (8.5.0-2ubuntu10.9) ...
+Selecting previously unselected package curl.
+Preparing to unpack .../curl_8.5.0-2ubuntu10.9_arm64.deb ...
+Unpacking curl (8.5.0-2ubuntu10.9) ...
+Setting up libcurl4t64:arm64 (8.5.0-2ubuntu10.9) ...
+Setting up curl (8.5.0-2ubuntu10.9) ...
+Processing triggers for libc-bin (2.39-0ubuntu8.7) ...
+downloading uv 0.9.5 aarch64-unknown-linux-gnu
+no checksums to verify
+installing to /root/.local/bin
+  uv
+  uvx
+everything's installed!
+
+To add $HOME/.local/bin to your PATH, either restart your shell or run:
+
+    source $HOME/.local/bin/env (sh, bash, zsh)
+    source $HOME/.local/bin/env.fish (fish)
+Downloading cpython-3.13.9-linux-aarch64-gnu (download) (27.1MiB)
+ Downloading cpython-3.13.9-linux-aarch64-gnu (download)
+Downloading pygments (1.2MiB)
+ Downloading pygments
+Installed 6 packages in 23ms
+============================= test session starts ==============================
+platform linux -- Python 3.13.9, pytest-8.4.1, pluggy-1.6.0
+rootdir: /tests
+plugins: json-ctrf-0.3.5
+collected 6 items
+
+../tests/test_outputs.py .FFFFF                                          [100%]
+
+=================================== FAILURES ===================================
+_________________________ test_program_compiles_debug __________________________
+
+    def test_program_compiles_debug():
+        """Test that the program compiles in debug mode."""
+>       executable = compile_program("debug")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tests/test_outputs.py:106: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+build_type = 'debug'
+
+    def compile_program(build_type):
+        """Compile the program with specified build type (debug or release)."""
+        src_files = [
+            "/app/main.cpp",
+            "/app/user.cpp"
+        ]
+        output_file = f"/app/{build_type}"
+    
+        if build_type == "debug":
+            compile_flags = ["-g", "-O0"]
+            # Use debug version of libstdc++ (built without NDEBUG)
+            lib_path = "/usr/local/gcc-custom-debug/lib64"
+        else:  # release
+            compile_flags = ["-O2", "-DNDEBUG"]
+            # Use release version of libstdc++ (built with NDEBUG - has the bug)
+            lib_path = "/usr/local/gcc-custom-release/lib64"
+    
+        # Link against the appropriate version of libstdc++ with static linking
+        # Static linking ensures we use the specific version (debug or release)
+        custom_lib_flags = [
+            f"-L{lib_path}",
+            "-Wl,-Bstatic",
+            "-lstdc++",
+            "-Wl,-Bdynamic",
+            "-lm"
+        ]
+    
+        cmd = ["g++", "-std=c++17", "-o", output_file] + src_files + compile_flags + custom_lib_flags
+    
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    
+        if result.returncode != 0:
+>           pytest.fail(
+                f"Failed to compile {build_type} build:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
+E           Failed: Failed to compile debug build:
+E           STDOUT: 
+E           STDERR: /usr/bin/ld: /tmp/ccW9MAc9.o: in function `operator new(unsigned long, void*)':
+E           /app/user.cpp:75: multiple definition of `operator new(unsigned long)'; /tmp/ccaq0Jej.o:/app/main.cpp:72: first defined here
+E           /usr/bin/ld: /tmp/ccW9MAc9.o: in function `operator new[](unsigned long)':
+E           /app/user.cpp:85: multiple definition of `operator new[](unsigned long)'; /tmp/ccaq0Jej.o:/app/main.cpp:82: first defined here
+E           /usr/bin/ld: /tmp/ccW9MAc9.o: in function `operator delete(void*)':
+E           /app/user.cpp:95: multiple definition of `operator delete(void*)'; /tmp/ccaq0Jej.o:/app/main.cpp:92: first defined here
+E           /usr/bin/ld: /tmp/ccW9MAc9.o: in function `operator delete[](void*)':
+E           /app/user.cpp:105: multiple definition of `operator delete[](void*)'; /tmp/ccaq0Jej.o:/app/main.cpp:102: first defined here
+E           /usr/bin/ld: /tmp/ccW9MAc9.o: in function `operator delete(void*, unsigned long)':
+E           /app/user.cpp:115: multiple definition of `operator delete(void*, unsigned long)'; /tmp/ccaq0Jej.o:/app/main.cpp:112: first defined here
+E           /usr/bin/ld: /tmp/ccW9MAc9.o: in function `operator delete[](void*, unsigned long)':
+E           /app/user.cpp:119: multiple definition of `operator delete[](void*, unsigned long)'; /tmp/ccaq0Jej.o:/app/main.cpp:116: first defined here
+E           collect2: error: ld returned 1 exit status
+
+/tests/test_outputs.py:91: Failed
+________________________ test_program_compiles_release _________________________
+
+    def test_program_compiles_release():
+        """Test that the program compiles in release mode."""
+>       executable = compile_program("release")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tests/test_outputs.py:112: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+build_type = 'release'
+
+    def compile_program(build_type):
+        """Compile the program with specified build type (debug or release)."""
+        src_files = [
+            "/app/main.cpp",
+            "/app/user.cpp"
+        ]
+        output_file = f"/app/{build_type}"
+    
+        if build_type == "debug":
+            compile_flags = ["-g", "-O0"]
+            # Use debug version of libstdc++ (built without NDEBUG)
+            lib_path = "/usr/local/gcc-custom-debug/lib64"
+        else:  # release
+            compile_flags = ["-O2", "-DNDEBUG"]
+            # Use release version of libstdc++ (built with NDEBUG - has the bug)
+            lib_path = "/usr/local/gcc-custom-release/lib64"
+    
+        # Link against the appropriate version of libstdc++ with static linking
+        # Static linking ensures we use the specific version (debug or release)
+        custom_lib_flags = [
+            f"-L{lib_path}",
+            "-Wl,-Bstatic",
+            "-lstdc++",
+            "-Wl,-Bdynamic",
+            "-lm"
+        ]
+    
+        cmd = ["g++", "-std=c++17", "-o", output_file] + src_files + compile_flags + custom_lib_flags
+    
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    
+        if result.returncode != 0:
+>           pytest.fail(
+                f"Failed to compile {build_type} build:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
+E           Failed: Failed to compile release build:
+E           STDOUT: 
+E           STDERR: /usr/bin/ld: /tmp/cc8CrDnd.o: in function `operator delete(void*)':
+E           user.cpp:(.text+0x0): multiple definition of `operator delete(void*)'; /tmp/ccopWQBJ.o:main.cpp:(.text+0x170): first defined here
+E           /usr/bin/ld: /tmp/cc8CrDnd.o: in function `operator delete[](void*)':
+E           user.cpp:(.text+0x10): multiple definition of `operator delete[](void*)'; /tmp/ccopWQBJ.o:main.cpp:(.text+0x1a0): first defined here
+E           /usr/bin/ld: /tmp/cc8CrDnd.o: in function `operator delete(void*, unsigned long)':
+E           user.cpp:(.text+0x14): multiple definition of `operator delete(void*, unsigned long)'; /tmp/ccopWQBJ.o:main.cpp:(.text+0x1d0): first defined here
+E           /usr/bin/ld: /tmp/cc8CrDnd.o: in function `operator delete[](void*, unsigned long)':
+E           user.cpp:(.text+0x20): multiple definition of `operator delete[](void*, unsigned long)'; /tmp/ccopWQBJ.o:main.cpp:(.text+0x200): first defined here
+E           /usr/bin/ld: /tmp/cc8CrDnd.o: in function `operator new(unsigned long)':
+E           user.cpp:(.text+0x40): multiple definition of `operator new(unsigned long)'; /tmp/ccopWQBJ.o:main.cpp:(.text+0xd4): first defined here
+E           /usr/bin/ld: /tmp/cc8CrDnd.o: in function `operator new[](unsigned long)':
+E           user.cpp:(.text+0x44): multiple definition of `operator new[](unsigned long)'; /tmp/ccopWQBJ.o:main.cpp:(.text+0x120): first defined here
+E           collect2: error: ld returned 1 exit status
+
+/tests/test_outputs.py:91: Failed
+_____________________ test_debug_build_runs_without_crash ______________________
+
+    def test_debug_build_runs_without_crash():
+        """
+        Test that the debug build runs without crashing.
+        Debug build should ALWAYS pass because it uses malloc/free instead of custom heap.
+        """
+>       executable = compile_program("debug")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tests/test_outputs.py:121: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+build_type = 'debug'
+
+    def compile_program(build_type):
+        """Compile the program with specified build type (debug or release)."""
+        src_files = [
+            "/app/main.cpp",
+            "/app/user.cpp"
+        ]
+        output_file = f"/app/{build_type}"
+    
+        if build_type == "debug":
+            compile_flags = ["-g", "-O0"]
+            # Use debug version of libstdc++ (built without NDEBUG)
+            lib_path = "/usr/local/gcc-custom-debug/lib64"
+        else:  # release
+            compile_flags = ["-O2", "-DNDEBUG"]
+            # Use release version of libstdc++ (built with NDEBUG - has the bug)
+            lib_path = "/usr/local/gcc-custom-release/lib64"
+    
+        # Link against the appropriate version of libstdc++ with static linking
+        # Static linking ensures we use the specific version (debug or release)
+        custom_lib_flags = [
+            f"-L{lib_path}",
+            "-Wl,-Bstatic",
+            "-lstdc++",
+            "-Wl,-Bdynamic",
+            "-lm"
+        ]
+    
+        cmd = ["g++", "-std=c++17", "-o", output_file] + src_files + compile_flags + custom_lib_flags
+    
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    
+        if result.returncode != 0:
+>           pytest.fail(
+                f"Failed to compile {build_type} build:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
+E           Failed: Failed to compile debug build:
+E           STDOUT: 
+E           STDERR: /usr/bin/ld: /tmp/cczzpEj1.o: in function `operator new(unsigned long, void*)':
+E           /app/user.cpp:75: multiple definition of `operator new(unsigned long)'; /tmp/ccj7cR2n.o:/app/main.cpp:72: first defined here
+E           /usr/bin/ld: /tmp/cczzpEj1.o: in function `operator new[](unsigned long)':
+E           /app/user.cpp:85: multiple definition of `operator new[](unsigned long)'; /tmp/ccj7cR2n.o:/app/main.cpp:82: first defined here
+E           /usr/bin/ld: /tmp/cczzpEj1.o: in function `operator delete(void*)':
+E           /app/user.cpp:95: multiple definition of `operator delete(void*)'; /tmp/ccj7cR2n.o:/app/main.cpp:92: first defined here
+E           /usr/bin/ld: /tmp/cczzpEj1.o: in function `operator delete[](void*)':
+E           /app/user.cpp:105: multiple definition of `operator delete[](void*)'; /tmp/ccj7cR2n.o:/app/main.cpp:102: first defined here
+E           /usr/bin/ld: /tmp/cczzpEj1.o: in function `operator delete(void*, unsigned long)':
+E           /app/user.cpp:115: multiple definition of `operator delete(void*, unsigned long)'; /tmp/ccj7cR2n.o:/app/main.cpp:112: first defined here
+E           /usr/bin/ld: /tmp/cczzpEj1.o: in function `operator delete[](void*, unsigned long)':
+E           /app/user.cpp:119: multiple definition of `operator delete[](void*, unsigned long)'; /tmp/ccj7cR2n.o:/app/main.cpp:116: first defined here
+E           collect2: error: ld returned 1 exit status
+
+/tests/test_outputs.py:91: Failed
+____________________ test_release_build_runs_without_crash _____________________
+
+    def test_release_build_runs_without_crash():
+        """
+        Test that the release build runs without crashing.
+        This test will fail on the buggy version but pass on the fixed version.
+        """
+>       executable = compile_program("release")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tests/test_outputs.py:135: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+build_type = 'release'
+
+    def compile_program(build_type):
+        """Compile the program with specified build type (debug or release)."""
+        src_files = [
+            "/app/main.cpp",
+            "/app/user.cpp"
+        ]
+        output_file = f"/app/{build_type}"
+    
+        if build_type == "debug":
+            compile_flags = ["-g", "-O0"]
+            # Use debug version of libstdc++ (built without NDEBUG)
+            lib_path = "/usr/local/gcc-custom-debug/lib64"
+        else:  # release
+            compile_flags = ["-O2", "-DNDEBUG"]
+            # Use release version of libstdc++ (built with NDEBUG - has the bug)
+            lib_path = "/usr/local/gcc-custom-release/lib64"
+    
+        # Link against the appropriate version of libstdc++ with static linking
+        # Static linking ensures we use the specific version (debug or release)
+        custom_lib_flags = [
+            f"-L{lib_path}",
+            "-Wl,-Bstatic",
+            "-lstdc++",
+            "-Wl,-Bdynamic",
+            "-lm"
+        ]
+    
+        cmd = ["g++", "-std=c++17", "-o", output_file] + src_files + compile_flags + custom_lib_flags
+    
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    
+        if result.returncode != 0:
+>           pytest.fail(
+                f"Failed to compile {build_type} build:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
+E           Failed: Failed to compile release build:
+E           STDOUT: 
+E           STDERR: /usr/bin/ld: /tmp/ccBqCWbx.o: in function `operator delete(void*)':
+E           user.cpp:(.text+0x0): multiple definition of `operator delete(void*)'; /tmp/cc7s1SP0.o:main.cpp:(.text+0x170): first defined here
+E           /usr/bin/ld: /tmp/ccBqCWbx.o: in function `operator delete[](void*)':
+E           user.cpp:(.text+0x10): multiple definition of `operator delete[](void*)'; /tmp/cc7s1SP0.o:main.cpp:(.text+0x1a0): first defined here
+E           /usr/bin/ld: /tmp/ccBqCWbx.o: in function `operator delete(void*, unsigned long)':
+E           user.cpp:(.text+0x14): multiple definition of `operator delete(void*, unsigned long)'; /tmp/cc7s1SP0.o:main.cpp:(.text+0x1d0): first defined here
+E           /usr/bin/ld: /tmp/ccBqCWbx.o: in function `operator delete[](void*, unsigned long)':
+E           user.cpp:(.text+0x20): multiple definition of `operator delete[](void*, unsigned long)'; /tmp/cc7s1SP0.o:main.cpp:(.text+0x200): first defined here
+E           /usr/bin/ld: /tmp/ccBqCWbx.o: in function `operator new(unsigned long)':
+E           user.cpp:(.text+0x40): multiple definition of `operator new(unsigned long)'; /tmp/cc7s1SP0.o:main.cpp:(.text+0xd4): first defined here
+E           /usr/bin/ld: /tmp/ccBqCWbx.o: in function `operator new[](unsigned long)':
+E           user.cpp:(.text+0x44): multiple definition of `operator new[](unsigned long)'; /tmp/cc7s1SP0.o:main.cpp:(.text+0x120): first defined here
+E           collect2: error: ld returned 1 exit status
+
+/tests/test_outputs.py:91: Failed
+______________________ test_no_memory_leaks_with_valgrind ______________________
+
+    def test_no_memory_leaks_with_valgrind():
+        """
+        Test that there are no memory leaks using Valgrind.
+        This prevents cheating by using quick_exit() or similar workarounds.
+        If static destructors don't run, Valgrind will report memory leaks.
+        """
+>       executable = compile_program("release")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/tests/test_outputs.py:150: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+build_type = 'release'
+
+    def compile_program(build_type):
+        """Compile the program with specified build type (debug or release)."""
+        src_files = [
+            "/app/main.cpp",
+            "/app/user.cpp"
+        ]
+        output_file = f"/app/{build_type}"
+    
+        if build_type == "debug":
+            compile_flags = ["-g", "-O0"]
+            # Use debug version of libstdc++ (built without NDEBUG)
+            lib_path = "/usr/local/gcc-custom-debug/lib64"
+        else:  # release
+            compile_flags = ["-O2", "-DNDEBUG"]
+            # Use release version of libstdc++ (built with NDEBUG - has the bug)
+            lib_path = "/usr/local/gcc-custom-release/lib64"
+    
+        # Link against the appropriate version of libstdc++ with static linking
+        # Static linking ensures we use the specific version (debug or release)
+        custom_lib_flags = [
+            f"-L{lib_path}",
+            "-Wl,-Bstatic",
+            "-lstdc++",
+            "-Wl,-Bdynamic",
+            "-lm"
+        ]
+    
+        cmd = ["g++", "-std=c++17", "-o", output_file] + src_files + compile_flags + custom_lib_flags
+    
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    
+        if result.returncode != 0:
+>           pytest.fail(
+                f"Failed to compile {build_type} build:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+            )
+E           Failed: Failed to compile release build:
+E           STDOUT: 
+E           STDERR: /usr/bin/ld: /tmp/ccAuc4cY.o: in function `operator delete(void*)':
+E           user.cpp:(.text+0x0): multiple definition of `operator delete(void*)'; /tmp/ccEanLC8.o:main.cpp:(.text+0x170): first defined here
+E           /usr/bin/ld: /tmp/ccAuc4cY.o: in function `operator delete[](void*)':
+E           user.cpp:(.text+0x10): multiple definition of `operator delete[](void*)'; /tmp/ccEanLC8.o:main.cpp:(.text+0x1a0): first defined here
+E           /usr/bin/ld: /tmp/ccAuc4cY.o: in function `operator delete(void*, unsigned long)':
+E           user.cpp:(.text+0x14): multiple definition of `operator delete(void*, unsigned long)'; /tmp/ccEanLC8.o:main.cpp:(.text+0x1d0): first defined here
+E           /usr/bin/ld: /tmp/ccAuc4cY.o: in function `operator delete[](void*, unsigned long)':
+E           user.cpp:(.text+0x20): multiple definition of `operator delete[](void*, unsigned long)'; /tmp/ccEanLC8.o:main.cpp:(.text+0x200): first defined here
+E           /usr/bin/ld: /tmp/ccAuc4cY.o: in function `operator new(unsigned long)':
+E           user.cpp:(.text+0x40): multiple definition of `operator new(unsigned long)'; /tmp/ccEanLC8.o:main.cpp:(.text+0xd4): first defined here
+E           /usr/bin/ld: /tmp/ccAuc4cY.o: in function `operator new[](unsigned long)':
+E           user.cpp:(.text+0x44): multiple definition of `operator new[](unsigned long)'; /tmp/ccEanLC8.o:main.cpp:(.text+0x120): first defined here
+E           collect2: error: ld returned 1 exit status
+
+/tests/test_outputs.py:91: Failed
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED ../tests/test_outputs.py::test_protected_files_not_modified
+FAILED ../tests/test_outputs.py::test_program_compiles_debug - Failed: Failed...
+FAILED ../tests/test_outputs.py::test_program_compiles_release - Failed: Fail...
+FAILED ../tests/test_outputs.py::test_debug_build_runs_without_crash - Failed...
+FAILED ../tests/test_outputs.py::test_release_build_runs_without_crash - Fail...
+FAILED ../tests/test_outputs.py::test_no_memory_leaks_with_valgrind - Failed:...
+========================= 5 failed, 1 passed in 4.12s ==========================
