@@ -1,0 +1,44 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 2,
+            "passed": 0,
+            "failed": 2,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1778563199.5270226,
+            "stop": 1778563213.1974075
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_accuracy",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 8.676257570041344,
+                "start": 1778563204.4183207,
+                "stop": 1778563213.194709,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_accuracy():\n        \"\"\"Test accuracy of the fasttext model on the test set.\"\"\"\n        model = fasttext.load_model(\"/app/model.bin\")\n    \n        true_labels = []\n        predicted_labels = []\n    \n        with open(\"/tests/private_test.txt\", \"r\", encoding=\"utf-8\") as f:\n            for line in f:\n                parts = line.strip().split(\" \", 1)\n                if len(parts) == 2:\n                    true_label = parts[0]\n                    text = parts[1]\n>                   prediction = model.predict(text)[0][0]\n                                 ^^^^^^^^^^^^^^^^^^^\n\n/tests/test_outputs.py:25: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nself = <fasttext.FastText._FastText object at 0xe33ea318bdd0>\ntext = \"I got 'new' tires from them and within two weeks got a flat. I took my car to a local mechanic to see if i could get ... will never go back to Flynn's b/c of the way this guy treated me and the simple fact that they gave me a used tire!\\n\"\nk = 1, threshold = 0.0, on_unicode_error = 'strict'\n\n    def predict(self, text, k=1, threshold=0.0, on_unicode_error='strict'):\n        \"\"\"\n        Given a string, get a list of labels and a list of\n        corresponding probabilities. k controls the number\n        of returned labels. A choice of 5, will return the 5\n        most probable labels. By default this returns only\n        the most likely label and probability. threshold filters\n        the returned labels by a threshold on probability. A\n        choice of 0.5 will return labels with at least 0.5\n        probability. k and threshold will be applied together to\n        determine the returned labels.\n    \n        This function assumes to be given\n        a single line of text. We split words on whitespace (space,\n        newline, tab, vertical tab) and the control characters carriage\n        return, formfeed and the null character.\n    \n        If the model is not supervised, this function will throw a ValueError.\n    \n        If given a list of strings, it will return a list of results as usually\n        received for a single line of text.\n        \"\"\"\n    \n        def check(entry):\n            if entry.find('\\n') != -1:\n                raise ValueError(\n                    \"predict processes one line at a time (remove \\'\\\\n\\')\"\n                )\n            entry += \"\\n\"\n            return entry\n    \n        if type(text) == list:\n            text = [check(entry) for entry in text]\n            all_labels, all_probs = self.f.multilinePredict(\n                text, k, threshold, on_unicode_error)\n    \n            return all_labels, all_probs\n        else:\n            text = check(text)\n>           predictions = self.f.predict(text, k, threshold, on_unicode_error)\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE           RuntimeError: Encountered NaN.\n\n/root/.cache/uv/archive-v0/0NrYLWHMQWNEy-nTcZTmY/lib/python3.11/site-packages/fasttext/FastText.py:222: RuntimeError",
+                "message": "The test failed in the call phase"
+            },
+            {
+                "name": "test_outputs.py::test_model_size",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 0.0005184510955587029,
+                "start": 1778563213.1950955,
+                "stop": 1778563213.196578,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_model_size():\n        \"\"\"Test the size of the model.\"\"\"\n        model_size = os.path.getsize(\"/app/model.bin\")\n>       assert model_size < MAX_MODEL_SIZE\nE       assert 902487208 < 157286400\n\n/tests/test_outputs.py:36: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            }
+        ]
+    }
+}

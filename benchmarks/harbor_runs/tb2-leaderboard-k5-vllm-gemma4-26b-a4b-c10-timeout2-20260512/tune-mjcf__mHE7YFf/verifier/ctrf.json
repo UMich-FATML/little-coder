@@ -1,0 +1,62 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 4,
+            "passed": 2,
+            "failed": 2,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1778568105.99166,
+            "stop": 1778568135.5605617
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_model_ref_unchanged",
+                "status": "passed",
+                "duration": 0.0005252519622445107,
+                "start": 1778568106.3752215,
+                "stop": 1778568106.3759816,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_tuned_model_exists",
+                "status": "passed",
+                "duration": 0.0001699049025774002,
+                "start": 1778568106.3760707,
+                "stop": 1778568106.3762925,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_correctness",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 1.4128181770211086,
+                "start": 1778568106.3763487,
+                "stop": 1778568107.8030035,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_correctness():\n        \"\"\"Compare final states of models with potentially different timesteps\"\"\"\n        model_path = app_dir / \"model.xml\"\n        model_ref_path = app_dir / \"model_ref.xml\"\n    \n        model = mujoco.MjModel.from_xml_path(str(model_path))\n        model_ref = mujoco.MjModel.from_xml_path(str(model_ref_path))\n    \n        seed = np.random.randint(0, 10000)\n        final_state = simulate_model(model, seed)\n        final_state_ref = simulate_model(model_ref, seed)\n    \n        # compare final states\n        state_diff = np.linalg.norm(final_state - final_state_ref)\n        print(f\"Final state difference: {state_diff:.4f}\")\n    \n>       assert np.allclose(final_state, final_state_ref, atol=atol), (\n            f\"Final states differ by {state_diff}, exceeding tolerance {atol}\"\n        )\nE       AssertionError: Final states differ by 3583442.5295314975, exceeding tolerance 1e-05\nE       assert False\nE        +  where False = <function allclose at 0xeb06d9960570>(array([ 2.50000000e-03, -3.08945537e-01, -4.18616247e-29,  9.51079731e-01,\\n       -7.54864376e-31,  8.39215029e-01, -1...1499e-20, -1.62147712e+06, -4.59933596e-18,\\n       -5.94816877e-19,  1.11436092e+06,  3.41839917e-17,  1.04064408e+03]), array([ 2.00000000e+00,  9.74971486e-01, -9.89591191e-04,  2.22318094e-01,\\n       -2.07065534e-03,  9.87770782e-01, -5...1003e-05,  5.60573476e-03, -6.62673094e-03,\\n       -8.51729823e-06,  2.95421540e-03, -4.00831650e-03, -5.73784123e-02]), atol=1e-05)\nE        +    where <function allclose at 0xeb06d9960570> = np.allclose\n\n/tests/test_outputs.py:67: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            },
+            {
+                "name": "test_outputs.py::test_model_speed",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 27.752981596975587,
+                "start": 1778568107.803177,
+                "stop": 1778568135.5602944,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_model_speed():\n        \"\"\"Test that new model is faster than the reference model\"\"\"\n        model_path = app_dir / \"model.xml\"\n        model_ref_path = app_dir / \"model_ref.xml\"\n    \n        model = mujoco.MjModel.from_xml_path(str(model_path))\n        model_ref = mujoco.MjModel.from_xml_path(str(model_ref_path))\n    \n        times_model = simulation_time(model, n_runs=n_runs)\n        times_model = drop_extreme_percentiles(times_model, 5, 95)\n        times_model_ref = simulation_time(model_ref, n_runs=n_runs)\n        times_model_ref = drop_extreme_percentiles(times_model_ref, 5, 95)\n        speedup = (times_model_ref / times_model).mean().item()\n        act_time_pctg = (times_model / times_model_ref).mean().item()\n    \n        print(f\"Avg simulation time: {times_model.mean().item():.4f} secs\")\n        print(f\"Avg simulation time (ref): {times_model_ref.mean().item():.4f} secs\")\n        print(f\"Speedup: {speedup:.2f}x\")\n        print(f\"Time pctg: {act_time_pctg:.2f}\")\n    \n>       assert act_time_pctg <= pctg, (\n            f\"Time pctg {act_time_pctg * 100:.2f}% (need {pctg * 100:.2f}%)\"\n        )\nE       AssertionError: Time pctg 417.55% (need 60.00%)\nE       assert 4.175511171623155 <= 0.6\n\n/tests/test_outputs.py:111: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            }
+        ]
+    }
+}

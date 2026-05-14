@@ -1,0 +1,50 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 3,
+            "passed": 2,
+            "failed": 1,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1778588620.5694954,
+            "stop": 1778588620.9019363
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_structure_event_title_attendees_duration_window",
+                "status": "failed",
+                "raw_status": "call_failed",
+                "duration": 0.0010638480307534337,
+                "start": 1778588620.6231112,
+                "stop": 1778588620.6337352,
+                "retries": 0,
+                "file_path": "test_outputs.py",
+                "trace": "def test_structure_event_title_attendees_duration_window():\n        \"\"\"ICS structure/headers, VEVENT, title/ATTENDEE, 1h, Jan 15\u201319 weekdays.\"\"\"\n        # Integrity check: ensure calendars under /app match pristine inputs\n        for fname in (\"alice_calendar.ics\", \"bob_calendar.ics\", \"carol_calendar.ics\"):\n            app_text = (Path(\"/app\") / fname).read_text()\n            repo_path = Path(__file__).resolve().parent.parent / \"inputs\" / fname\n            if repo_path.exists():\n                assert app_text == repo_path.read_text(), f\"Input modified: {fname}\"\n            else:\n                digest = hashlib.sha256(app_text.encode()).hexdigest()\n                assert digest == _EXPECTED_SHA256[fname], f\"Input modified: {fname}\"\n        c = _r(\"/app/meeting_scheduled.ics\")\n        assert c.strip().startswith(\"BEGIN:VCALENDAR\")\n        assert c.strip().endswith(\"END:VCALENDAR\")\n        assert \"VERSION:2.0\" in c\n        assert \"PRODID:\" in c\n        assert \"BEGIN:VEVENT\" in c\n        assert \"END:VEVENT\" in c\n    \n        # Identify the Team Planning Meeting VEVENT and extract fields\n        vevents = re.findall(r\"BEGIN:VEVENT(.*?)END:VEVENT\", c, flags=re.S)\n        assert vevents, \"Missing VEVENT block\"\n        meeting = next(\n            (\n                b\n                for b in vevents\n                if \"SUMMARY:Team Planning Meeting\" in b and all(e in b for e in EMAILS)\n            ),\n            None,\n        )\n        assert meeting, (\n            \"Meeting VEVENT with required SUMMARY and ATTENDEE entries not found\"\n        )\n    \n        for email in EMAILS:\n>           assert re.search(\n                rf\"^ATTENDEE[:;].*{re.escape(email)}$\", meeting, re.I | re.M\n            ), f\"Missing ATTENDEE property for {email} in meeting VEVENT\"\nE           AssertionError: Missing ATTENDEE property for alice@example.com in meeting VEVENT\nE           assert None\nE            +  where None = <function search at 0xfd95f42ad440>('^ATTENDEE[:;].*alice@example\\\\.com$', '\\nUID:team-planning@example.com\\nDTSTART:20240117T110000Z\\nDTEND:20240117T120000Z\\nSUMMARY:Team Planning Meeting\\nDES...RTSTAT=ACCEPTED:<mailto:bob@example.com>\\nATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:<mailto:carol@example.com>\\n', (re.IGNORECASE | re.MULTILINE))\nE            +    where <function search at 0xfd95f42ad440> = re.search\nE            +    and   re.IGNORECASE = re.I\nE            +    and   re.MULTILINE = re.M\n\n/tests/test_outputs.py:121: AssertionError",
+                "message": "The test failed in the call phase due to an assertion error"
+            },
+            {
+                "name": "test_outputs.py::test_constraints_conflicts_business_hours",
+                "status": "passed",
+                "duration": 0.008225190918892622,
+                "start": 1778588620.633852,
+                "stop": 1778588620.642202,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_earliest_tiebreakers_and_carol_buffer",
+                "status": "passed",
+                "duration": 0.2593969798181206,
+                "start": 1778588620.6422915,
+                "stop": 1778588620.901827,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            }
+        ]
+    }
+}
