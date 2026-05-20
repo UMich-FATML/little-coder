@@ -1,0 +1,377 @@
+=== assistant text ===
+I'll start by examining the opponent warriors to understand their strategies, then write a competitive CoreWars program.
+
+Now I understand the opponents. Let me write a comprehensive warrior that handles all five opponents well.
+
+I need to add the `ptr` label. Let me fix the scanner:
+
+Only 11% win rate vs Stone. The scanner approach isn't aggressive enough. Let me rethink and write a more aggressive warrior.
+
+Current results are poor. I need a much more aggressive warrior. Let me study what works in CoreWars and write a proper multi-strategy warrior.
+
+Now I have a good understanding of CoreWars strategies. Let me write a proper warrior that combines multiple effective strategies:
+
+Still terrible. The problem is that my warrior is too small and the stone bomber overwhelms it. Let me study what makes a good CoreWars warrior more carefully. The key insight is that stone drops DAT every 4 positions, so it fills memory with DAT. A good counter is to either:
+1. Use a scanner that finds the stone and destroys it
+2. Use a bomber that drops DAT more densely
+3. Use imps that copy themselves through memory
+
+Let me write a more complete warrior:
+
+The problem is fundamental - my bomber drops DAT at every position but stone drops DAT every 4 positions, so stone fills memory faster. The scanner isn't finding stone fast enough. Let me think about this differently.
+
+The key issue: stone is a simple bomber that fills memory with DAT. To beat it, I need to either:
+1. Bomb faster (every position)
+2. Find and kill the stone code directly
+3. Use a gate-busting imp that can destroy the bomber
+
+Let me write a warrior that focuses on being a fast bomber with a scanner component:
+
+The problem is that the scanner is slow and the bomber isn't aggressive enough. Let me try a completely different approach - a pure bomber that's more compact and aggressive, plus a gate-busting imp:
+
+The issue is that stone drops DAT every 4 positions, so it covers 1/4 of memory. My bomber drops DAT every position but it's slower because it has to execute more instructions. Let me look at this more carefully - stone's loop is:
+
+```
+start   add #4, 3
+        mov 2, @2  
+        jmp -2
+        dat #0, #0
+```
+
+This is a 4-instruction loop. My bomber is:
+```
+bomber  add #1, ptr
+        mov 2, @2
+        jmp -2
+```
+
+Also 3 instructions + 1 data. But the key difference is that stone's `add #4, 3` adds 4 to the B-field of the DAT at offset 3, making it a bomb counter. My `add #1, ptr` adds 1 to ptr's B-field. The issue is that stone's loop is shorter and faster.
+
+Let me try a different approach - use a scanner that specifically targets the stone's pattern:
+
+That's even worse. The scanner approach with step=4 is too slow. Let me think about this differently.
+
+The fundamental problem: stone is a bomber that fills memory with DAT. To beat it, I need to either:
+1. Be a faster bomber (drop more DAT per cycle)
+2. Find and kill the stone code before it fills memory
+3. Use a gate-busting imp that can destroy the bomber
+
+Let me try a different approach - a compact, fast bomber with many splitters:
+
+Better! 16 wins, 64 ties. The bomber approach works but needs more splitters. Let me try with more splitters:
+
+24 wins, 64 ties. Getting better. Let me try even more splitters:
+
+
+
+>> ShellSession({'command': 'ls /home/yuekai/little-coder/warriors/'})
+<< ls: cannot access '/home/yuekai/little-coder/warriors/': No such file or directory
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'find / -name "warriors" -type d 2>/dev/null; find / -name "*.red" 2>/dev/null | head -20', 'timeout': 10})
+<< /app/warriors
+/app/pmars-0.9.4/warriors
+/app/warriors/g2-clear.red
+/app/warriors/snake.red
+/app/warriors/paper.red
+/app/warriors/vampire.red
+/app/warriors/stone.red
+/app/pmars-0.9.4/warriors/pspace.red
+/app/pmars-0.9.4/warriors/aeka.red
+/app/pmars-0.9.4/warriors/test_eval.red
+/app/pmars-0.9.4/warriors/flashpaper.red
+/app/pmars-0.9.4/warriors/validate.red
+/app/pmars-0.9.4/warriors/rave.red
+[exit=0 
+>> ShellSession({'command': 'cat /app/warriors/stone.red'})
+<< ;redcode-94
+;name Stone
+;author mzvince (Everything2)
+;source https://everything2.com/title/bomber
+;strategy Classic stone bomber - drops DAT every 4 positions
+;assert CORESIZE == 8000
+
+start   add #4, 3
+        mov 2, @2  
+        jmp -2
+        dat #0, #0
+        
+        end start
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/warriors/paper.red'})
+<< ;redcode-94
+;name Paper
+;author mzvince (Everything2)
+;source https://everything2.com/title/corewars+replicator
+;strategy Classic paper replicator - fast copying beats stone bombers  
+;assert CORESIZE == 8000
+
+step    equ 2667    ; coprime step for full coverage
+
+start   spl 1       ; split for more processes
+        
+loop    mov copy, *ptr
+        add #1, ptr
+        mov copy, @ptr
+        add #s
+>> ShellSession({'command': 'cat /app/warriors/vampire.red'})
+<< ;redcode-94
+;name Vampire
+;author mzvince (Everything2)
+;source https://everything2.com/node/581524 (with minor adjustments)
+;strategy Vampire/pit-trapper: scatter fangs (JMP) that send enemy into a pit which clears.
+;assert CORESIZE == 8000 && MAXCYCLES == 80000
+
+const   EQU     7
+
+        SPL     0                   ; prevent instant bomber kill
+main    MOV     ptr, @ptr           ; drop fang (J
+>> ShellSession({'command': 'cat /app/warriors/snake.red'})
+<< ;redcode-94
+;name Snake
+;author Wayne Sheppard
+;source https://corewar.co.uk/snake.htm
+;strategy Pitbomber-impspiral
+;assert CORESIZE == 8000 && MAXCYCLES == 80000
+
+;Dan only plays bombers and imps on the hill.  But I am hoping
+;that he will go with a paper or scanner
+
+;Snake is a vampire and imp
+;Night Crawler would lose vs paper
+;The vampire should gain enough wins to beat paper
+;Should still ha
+>> ShellSession({'command': 'cat /app/warriors/g2-clear.red'})
+<< ;redcode-94
+;name G2-Clear
+;author Unknown
+;source https://corewar.co.uk/clear.htm
+;strategy Simple clear loop with decrementing pointer
+;assert CORESIZE == 8000 && MAXCYCLES == 80000
+
+dec     equ     2700                ; Decrement value for bomb counter
+gate    equ     clear-4             ; Gate location relative to clear
+
+        org     clear-1             ; Start execution before clear
+
+; Mai
+>> ShellSession({'command': 'cat /app/pmars-0.9.4/pmars.cfg 2>/dev/null || cat /app/pmars-0.9.4/*.cfg 2>/dev/null | head -50'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'which pmars && pmars --version 2>&1 | head -5'})
+<< /usr/local/bin/pmars
+pMARS v0.9.4, 04/07/22, corewar simulator with ICWS'94 extensions
+Copyright (C) 1993-95 Albert Ma, Na'ndor Sieben, Stefan Strack and Mintardjo Wangsaw
+Usage:
+   pmars [options] file1 [files ..]
+   The special file - stands for standard input
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/warriors/stone.red /app/warriors/paper.red 2>&1 | tail -20', 'timeout': 30})
+<< Stone by mzvince (Everything2) scores 282
+Paper by mzvince (Everything2) scores 9
+Results: 91 0 9
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/my_warrior.red << 'REDWARRIOR'\n;redcode-94\n;name MyWarrior\n;strategy Multi-purpose: scanner + bomber + imp launcher\n;assert CORESIZE == 8000 && MAXCYCLES == 80000\n\n; === SCANNER SECTION ===\n; A simple scanner that tests positions at intervals\n; to find and destroy enemy warriors\n\nstep    equ     333             ; coprime-ish step for scanning\n\nscan    cmp     @ptr, #0\n        jeq     next_scan\n        seq     ptr, #0\n        jeq     kill_found\n        add     step, ptr\n        jmp     scan\n\nkill_found\n        mov     bomb, @ptr\n        add     step, ptr\n\nnext_scan\n        add     step, ptr\n        djn     scan, #2000\n\n; === BOMBER SECTION ===\n; Drops bombs at regular intervals to kill scanners and bombers\n\nbomb    dat     #1, #1\n\n; === IMP LAUNCHER ===\n; Creates imp streams that copy themselves through memory\n\nimp     mov     0,     2667\n\n; === SPLITER ===\n; Splits to run multiple strategies simultaneously\n\nstart   spl     1\n        spl     1\n        spl     1\n\n; === CLEAR LOOP ===\n; Wipes memory with DAT bombs\n\nclear   mov     @bptr, >gate\n        djn.f   clear, }bomb\n\nbptr    dat     bomb, 9\ngate    equ     clear-4\n\n        end     start\nREDWARRIOR"})
+<< bash: line 55: warning: here-document at line 1 delimited by end-of-file (wanted `REDWARRIOR')
+bash: -c: line 56: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/my_warrior.red << 'EOF'\n;redcode-94\n;name MyWarrior\n;strategy Multi-purpose: scanner + bomber + imp launcher\n;assert CORESIZE == 8000 && MAXCYCLES == 80000\n\nstep    equ     333\n\nscan    cmp     @ptr, #0\n        jeq     next_scan\n        seq     ptr, #0\n        jeq     kill_found\n        add     step, ptr\n        jmp     scan\n\nkill_found\n        mov     bomb, @ptr\n        add     step, ptr\n\nnext_scan\n        add     step, ptr\n        djn     scan, #2000\n\nbomb    dat     #1, #1\n\nimp     mov     0,     2667\n\nstart   spl     1\n        spl     1\n        spl     1\n\nclear   mov     @bptr, >gate\n        djn.f   clear, }bomb\n\nbptr    dat     bomb, 9\ngate    equ     clear-4\n\n        end     start\nEOF"})
+<< bash: line 39: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 40: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Multi-purpose' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' 'step    equ     333' '' 'scan    cmp     @ptr, #0' '        jeq     next_scan' '        seq     ptr, #0' '        jeq     kill_found' '        add     step, ptr' '        jmp     scan' '' 'kill_found' '        mov     bomb, @ptr' '        add     step, ptr' '' 'next_scan' '        add     step, ptr' '        djn     scan, #2000' '' 'bomb    dat     #1, #1' '' 'imp     mov     0,     2667' '' 'start   spl     1' '        spl     1' '        spl     1' '' 'clear   mov     @bptr, >gate' '        djn.f   clear, }bomb' '' 'bptr    dat     bomb, 9' 'gate    equ     clear-4' '' '        end     start' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/my_warrior.red'})
+<< ;redcode-94
+;name MyWarrior
+;strategy Multi-purpose
+;assert CORESIZE == 8000 && MAXCYCLES == 80000
+
+step    equ     333
+
+scan    cmp     @ptr, #0
+        jeq     next_scan
+        seq     ptr, #0
+        jeq     kill_found
+        add     step, ptr
+        jmp     scan
+
+kill_found
+        mov     bomb, @ptr
+        add     step, ptr
+
+next_scan
+        add     step, ptr
+        djn     scan, #2000
+
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< Error in line 16: '        mov     bomb, @ptr'
+        Undefined label or symbol: 'ptr'
+
+Too many errors or warnings.
+Program aborted.
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Multi-purpose' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' 'step    equ     333' '' 'scan    cmp     @ptr, #0' '        jeq     next_scan' '        seq     ptr, #0' '        jeq     kill_found' '        add     step, ptr' '        jmp     scan' '' 'kill_found' '        mov     bomb, @ptr' '        add     step, ptr' '' 'next_scan' '        add     step, ptr' '        djn     scan, #2000' '' 'bomb    dat     #1, #1' '' 'imp     mov     0,     2667' '' 'ptr     dat     step, step' '' 'start   spl     1' '        spl     1' '        spl     1' '' 'clear   mov     @bptr, >gate' '        djn.f   clear, }bomb' '' 'bptr    dat     bomb, 9' 'gate    equ     clear-4' '' '        end     start' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 98
+Stone by mzvince (Everything2) scores 137
+Results: 11 24 65
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/paper.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 100
+Paper by mzvince (Everything2) scores 100
+Results: 0 0 100
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/vampire.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 145
+Vampire by mzvince (Everything2) scores 133
+Results: 41 37 22
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/snake.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 61
+Snake by Wayne Sheppard scores 187
+Results: 3 45 52
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/g2-clear.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 20
+G2-Clear by Unknown scores 260
+Results: 0 80 20
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/pmars-0.9.4/warriors/flashpaper.red'})
+<< ;redcode
+;name Flash Paper3.7
+;author Matt Hastings
+;A macrorized version of Flash Paper3.7
+;assert CORESIZE == 8000
+
+s01   EQU -2340
+s02   EQU  5823
+s03   EQU  1000
+s04   EQU  6109
+s05   EQU  3009
+s06   EQU  4832
+s07   EQU  1080
+s08   EQU -3040
+s09   EQU -3040
+
+m01   EQU  1020
+m02   EQU -740
+m03   EQU -3690
+m04   EQU  1873
+m05   EQU -200
+m06   EQU -1830
+m07   EQU  4096
+m08   EQU -195
+m09   EQU -1
+>> ShellSession({'command': 'cat /app/pmars-0.9.4/warriors/rave.red'})
+<< ;redcode-94
+;name Rave
+;author Stefan Strack
+;strategy Carpet-bombing scanner based on Agony and Medusa's
+;strategy (written in ICWS'94)
+;strategy Submitted: @date@
+;assert CORESIZE==8000
+
+CDIST   equ 12
+IVAL    equ 42
+FIRST   equ scan+OFFSET+IVAL
+OFFSET  equ (2*IVAL)
+DJNOFF  equ -431
+BOMBLEN equ CDIST+2
+
+        org comp
+
+scan    sub.f  incr,comp
+comp    cmp.i  FIRST,FIRST-CDIST        ;larger nu
+>> ShellSession({'command': 'cat /app/pmars-0.9.4/warriors/aeka.red'})
+<< ;redcode-94
+;name     Aeka
+;kill     Aeka
+;author   T.Hsu
+;strategy Suicidal stone & vector launched, gate busting imp spiral
+;assert   CORESIZE == 8000 && MAXLENGTH >= 100
+;-----------------------------------------------------------------------------
+;  1.0  Original based on Cannonade by P.Kline
+;  1.1  Erase pointer to stone, better decoy, use immediate mode more
+;  1.2  Reposition imps so that
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Stone bomber + imp launcher + clear' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Stone bomber - drops DAT bombs every 4 positions' 'bomber' '        add     #4, ptr' '        mov     2, @2' '        jmp     -2' '' '; Scanner that finds and destroys enemies' 'step    equ     2667' 'scan    cmp     @ptr, #0' '        jeq     next_scan' '        seq     ptr, #0' '        jeq     kill_found' '        add     step, ptr' '        jmp     scan' '' 'kill_found' '        mov     bomb, @ptr' '        add     step, ptr' '' 'next_scan' '        add     step, ptr' '        djn     scan, #1500' '' '; Bomb data' 'bomb    dat     #1, #1' '' '; Imp template' 'imp     mov     0,     2667' '' '; Pointer for scanner' 'ptr     dat     step, step' '' '; Clear loop' 'clear   mov     @bptr, >gate' '        djn.f   clear, }bomb' '' 'bptr    dat     bomb, 9' 'gate    equ     clear-4' '' '; Splitters for multi-threading' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     bomber' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 27
+Stone by mzvince (Everything2) scores 246
+Results: 0 73 27
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Aggressive bomber + imp launcher + scanner' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Main bomber loop - drops DAT bombs at every position' 'bomber' '        add     #1, ptr' '        mov     2, @2' '        jmp     -2' '' '; Scanner - find and destroy enemy code' 'step    equ     2667' 'scan    cmp     @ptr, #0' '        jeq     next_scan' '        seq     ptr, #0' '        jeq     kill_found' '        add     step, ptr' '        jmp     scan' '' 'kill_found' '        mov     bomb, @ptr' '        add     step, ptr' '' 'next_scan' '        add     step, ptr' '        djn     scan, #1500' '' '; Bomb data' 'bomb    dat     #1, #1' '' '; Imp template' 'imp     mov     0,     2667' '' '; Pointer for scanner' 'ptr     dat     step, step' '' '; Clear loop' 'clear   mov     @bptr, >gate' '        djn.f   clear, }bomb' '' 'bptr    dat     bomb, 9' 'gate    equ     clear-4' '' '; Splitters for multi-threading' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     bomber' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 28
+Stone by mzvince (Everything2) scores 244
+Results: 0 72 28
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Fast bomber with scanner' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Fast bomber - drops DAT bombs every position' 'bomber' '        add     #1, ptr' '        mov     2, @2' '        jmp     -2' '' '; Scanner to find and kill enemy code' 'step    equ     2667' 'scan    cmp     @ptr, #0' '        jeq     next_scan' '        seq     ptr, #0' '        jeq     kill_found' '        add     step, ptr' '        jmp     scan' '' 'kill_found' '        mov     bomb, @ptr' '        add     step, ptr' '' 'next_scan' '        add     step, ptr' '        djn     scan, #1500' '' '; Bomb data' 'bomb    dat     #1, #1' '' '; Imp template' 'imp     mov     0,     2667' '' '; Pointer for scanner' 'ptr     dat     step, step' '' '; Clear loop' 'clear   mov     @bptr, >gate' '        djn.f   clear, }bomb' '' 'bptr    dat     bomb, 9' 'gate    equ     clear-4' '' '; Splitters for multi-threading' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     bomber' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 23
+Stone by mzvince (Everything2) scores 254
+Results: 0 77 23
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Fast bomber + imp launcher' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Fast bomber - drops DAT bombs every position' 'bomber' '        add     #1, ptr' '        mov     2, @2' '        jmp     -2' '' '; Gate-busting imp' 'imp     mov     0,     2667' '' '; Pointer for bomber' 'ptr     dat     #1, #1' '' '; Splitters for multi-threading' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     bomber' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< MyWarrior by Anonymous scores 23
+Stone by mzvince (Everything2) scores 254
+Results: 0 77 23
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Scanner + bomber' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Scanner that checks every 4th position for stone pattern' 'step    equ     4' 'scan    cmp     @ptr, #0' '        jeq     next_scan' '        seq     ptr, #0' '        jeq     kill_found' '        add     step, ptr' '        jmp     scan' '' 'kill_found' '        mov     bomb, @ptr' '        add     step, ptr' '' 'next_scan' '        add     step, ptr' '        djn     scan, #1500' '' '; Bomb data' 'bomb    dat     #1, #1' '' '; Imp template' 'imp     mov     0,     2667' '' '; Pointer for scanner' 'ptr     dat     step, step' '' '; Splitters' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     scan' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< Number of warnings: 2
+
+MyWarrior by Anonymous scores 0
+Stone by mzvince (Everything2) scores 300
+Results: 0 100 0
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Fast bomber' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Fast bomber - drops DAT bombs every position' 'bomber' '        add     #1, ptr' '        mov     2, @2' '        jmp     -2' '' '; Pointer for bomber' 'ptr     dat     #1, #1' '' '; Splitters for multi-threading' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     bomber' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< MyWarrior by Anonymous scores 68
+Stone by mzvince (Everything2) scores 212
+Results: 16 64 20
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '%s\\n' ';redcode-94' ';name MyWarrior' ';strategy Fast bomber' ';assert CORESIZE == 8000 && MAXCYCLES == 80000' '' '; Fast bomber - drops DAT bombs every position' 'bomber' '        add     #1, ptr' '        mov     2, @2' '        jmp     -2' '' '; Pointer for bomber' 'ptr     dat     #1, #1' '' '; Splitters for multi-threading' 'start   spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '        spl     1' '' '        end     bomber' > /app/my_warrior.red"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< MyWarrior by Anonymous scores 84
+Stone by mzvince (Everything2) scores 204
+Results: 24 64 12
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nlines = [\';redcode-94\', \';name MyWarrior\', \';strategy Fast bomber\', \';assert CORESIZE == 8000 && MAXCYCLES == 80000\', \'\', \'bomber\', \'        add     #1, ptr\', \'        mov     2, @2\', \'        jmp     -2\', \'\', \'ptr     dat     #1, #1\', \'\', \'start   spl     1\']\nfor i in range(60):\n    lines.append(\'        spl     1\')\nlines.append(\'        end     bomber\')\nwith open(\'/app/my_warrior.red\', \'w\') as f:\n    f.write(\'\\n\'.join(lines) + \'\\n\')\n"'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pmars -b -r 100 -f /app/my_warrior.red /app/warriors/stone.red 2>&1 | tail -5', 'timeout': 60})
+<< MyWarrior by Anonymous scores 96
+Stone by mzvince (Everything2) scores 192
+Results: 28 60 12
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (4) ===
+[info] little-coder scaffold loaded
+[info] finalize-warn: 5 turns left at 36/40
+[warning] turn-cap: reached max_turns=40, aborting
+[warning] quality-monitor: empty_response → injecting correction

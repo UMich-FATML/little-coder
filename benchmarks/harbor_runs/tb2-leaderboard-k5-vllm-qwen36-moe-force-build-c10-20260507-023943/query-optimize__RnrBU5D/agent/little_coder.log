@@ -1,0 +1,158 @@
+=== assistant text ===
+Now let me rewrite the query to avoid the correlated subqueries by using a CTE-based approach with window functions:
+
+Now let me verify the output matches the original query:
+
+The issue is that `word_id` is an alias, not a column name. Let me fix the ORDER BY to use the actual column name:
+
+The outputs match exactly. Let me also verify the query plan is improved:
+
+The query plan shows no more correlated scalar subqueries — the expensive repeated lookups are eliminated. The original query had 3 correlated subqueries that re-executed per row; the new query uses CTEs with window functions to compute everything in a single pass.
+
+done
+
+>> ShellSession({'command': 'cat /app/my-sql-query.sql'})
+<< SELECT
+  w.wordid AS word_id,
+  w.word AS word,
+  total_synsets,
+  total_senses,
+  distinct_domains,
+  distinct_posids,
+  (SELECT s.synsetid FROM senses s 
+   WHERE s.wordid = w.wordid 
+   GROUP BY s.synsetid 
+   ORDER BY COUNT(*) DESC, s.synsetid ASC 
+   LIMIT 1) AS top_synsetid,
+  (SELECT COUNT(*) FROM senses s 
+   WHERE s.wordid = w.wordid 
+   AND s.synsetid = (SELECT s2.synsetid FROM senses s2
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite ".schema words"'})
+<< CREATE TABLE `words` (
+`wordid` INT NOT NULL,
+`word` VARCHAR(80) NOT NULL
+);
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite ".schema senses"'})
+<< CREATE TABLE `senses` (
+`senseid` INT NOT NULL,
+`sensekey` VARCHAR(100) DEFAULT NULL,
+`synsetid` INT NOT NULL,
+`luid` INT NOT NULL,
+`wordid` INT NOT NULL,
+`casedwordid` INT DEFAULT NULL,
+`lexid` INT NOT NULL,
+`sensenum` INT DEFAULT NULL,
+`tagcount` INT DEFAULT NULL
+);
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite ".schema synsets"'})
+<< CREATE TABLE `synsets` (
+`synsetid` INT NOT NULL,
+`posid` CHARACTER (1) CHECK( `posid` IN ('n','v','a','r','s') ) NOT NULL,
+`domainid` INT NOT NULL,
+`definition` MEDIUMTEXT NOT NULL
+);
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite "SELECT COUNT(*) FROM words; SELECT COUNT(*) FROM senses; SELECT COUNT(*) FROM synsets;"'})
+<< 152332
+212508
+120569
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite "EXPLAIN QUERY PLAN SELECT w.wordid AS word_id, w.word AS word, total_synsets, total_senses, distinct_domains, distinct_posids, (SELECT s.synsetid FROM senses s WHERE s.wordid = w.wordid GROUP BY s.synsetid ORDER BY COUNT(*) DESC, s.synsetid ASC LIMIT 1) AS top_synsetid, (SELECT COUNT(*) FROM senses s WHERE s.wordid = w.wordid AND s.synsetid = (SELECT s2.synsetid FROM senses s2 WHERE s2.wordid = w.wordid GROUP BY s2.synsetid ORDER BY COUNT(*) DESC, s2.synsetid ASC LIMIT 1)) AS top_synset_sense_count FROM (SELECT w.wordid, w.word, COUNT(DISTINCT s.synsetid) AS total_synsets, COUNT(*) AS total_senses, COUNT(DISTINCT syn.domainid) AS distinct_domains, COUNT(DISTINCT syn.posid) AS distinct_posids FROM words w JOIN senses s ON w.wordid = s.wordid JOIN synsets syn ON s.synsetid = syn.synsetid GROUP BY w.wordid, w.word HAVING total_synsets >= 2 AND distinct_domains >= 2 AND total_senses >= 2) w ORDER BY total_senses DESC, total_synsets DESC, distinct_domains DESC, word_id ASC LIMIT 500;"'})
+<< QUERY PLAN
+|--CO-ROUTINE w
+|  |--SCAN w
+|  |--BLOOM FILTER ON s (wordid=?)
+|  |--SEARCH s USING AUTOMATIC COVERING INDEX (wordid=?)
+|  |--BLOOM FILTER ON syn (synsetid=?)
+|  |--SEARCH syn USING AUTOMATIC COVERING INDEX (synsetid=?)
+|  |--USE TEMP B-TREE FOR GROUP BY
+|  |--USE TEMP B-TREE FOR count(DISTINCT)
+  [... 1 duplicate line(s) collapsed ...]
+|  `--USE TEMP B-TREE FOR count(DISTINCT)
+|--SCAN
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite "SELECT COUNT(*) FROM senses WHERE wordid = 1;"'})
+<< 1
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite "CREATE INDEX IF NOT EXISTS idx_senses_wordid ON senses(wordid); CREATE INDEX IF NOT EXISTS idx_senses_wordid_synsetid ON senses(wordid, synsetid); CREATE INDEX IF NOT EXISTS idx_synsets_synsetid ON synsets(synsetid); CREATE INDEX IF NOT EXISTS idx_synsets_domainid ON synsets(domainid); CREATE INDEX IF NOT EXISTS idx_synsets_posid ON synsets(posid);"'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/sol.sql << 'EOF'\nWITH word_stats AS (\n  SELECT\n    w.wordid,\n    w.word,\n    COUNT(DISTINCT s.synsetid) AS total_synsets,\n    COUNT(*) AS total_senses,\n    COUNT(DISTINCT syn.domainid) AS distinct_domains,\n    COUNT(DISTINCT syn.posid) AS distinct_posids\n  FROM words w\n  JOIN senses s ON w.wordid = s.wordid\n  JOIN synsets syn ON s.synsetid = syn.synsetid\n  GROUP BY w.wordid, w.word\n  HAVING total_synsets >= 2\n    AND distinct_domains >= 2\n    AND total_senses >= 2\n),\ntop_synset AS (\n  SELECT\n    s.wordid,\n    s.synsetid,\n    COUNT(*) AS cnt,\n    ROW_NUMBER() OVER (PARTITION BY s.wordid ORDER BY COUNT(*) DESC, s.synsetid ASC) AS rn\n  FROM senses s\n  JOIN word_stats ws ON s.wordid = ws.wordid\n  GROUP BY s.wordid, s.synsetid\n)\nSELECT\n  ws.wordid AS word_id,\n  ws.word AS word,\n  ws.total_synsets,\n  ws.total_senses,\n  ws.distinct_domains,\n  ws.distinct_posids,\n  ts.synsetid AS top_synsetid,\n  ts.cnt AS top_synset_sense_count\nFROM word_stats ws\nJOIN top_synset ts ON ws.wordid = ts.wordid AND ts.rn = 1\nORDER BY\n  ws.total_senses DESC,\n  ws.total_synsets DESC,\n  ws.distinct_domains DESC,\n  ws.word_id ASC\nLIMIT 500;\nEOF"})
+<< bash: line 45: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 46: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/sol.sql << 'ENDOFSQL'\nWITH word_stats AS (\n  SELECT\n    w.wordid,\n    w.word,\n    COUNT(DISTINCT s.synsetid) AS total_synsets,\n    COUNT(*) AS total_senses,\n    COUNT(DISTINCT syn.domainid) AS distinct_domains,\n    COUNT(DISTINCT syn.posid) AS distinct_posids\n  FROM words w\n  JOIN senses s ON w.wordid = s.wordid\n  JOIN synsets syn ON s.synsetid = syn.synsetid\n  GROUP BY w.wordid, w.word\n  HAVING total_synsets >= 2\n    AND distinct_domains >= 2\n    AND total_senses >= 2\n),\ntop_synset AS (\n  SELECT\n    s.wordid,\n    s.synsetid,\n    COUNT(*) AS cnt,\n    ROW_NUMBER() OVER (PARTITION BY s.wordid ORDER BY COUNT(*) DESC, s.synsetid ASC) AS rn\n  FROM senses s\n  JOIN word_stats ws ON s.wordid = ws.wordid\n  GROUP BY s.wordid, s.synsetid\n)\nSELECT\n  ws.wordid AS word_id,\n  ws.word AS word,\n  ws.total_synsets,\n  ws.total_senses,\n  ws.distinct_domains,\n  ws.distinct_posids,\n  ts.synsetid AS top_synsetid,\n  ts.cnt AS top_synset_sense_count\nFROM word_stats ws\nJOIN top_synset ts ON ws.wordid = ts.wordid AND ts.rn = 1\nORDER BY\n  ws.total_senses DESC,\n  ws.total_synsets DESC,\n  ws.distinct_domains DESC,\n  ws.word_id ASC\nLIMIT 500;\nENDOFSQL"})
+<< bash: line 45: warning: here-document at line 1 delimited by end-of-file (wanted `ENDOFSQL')
+bash: -c: line 46: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf 'WITH word_stats AS (\\n  SELECT\\n    w.wordid,\\n    w.word,\\n    COUNT(DISTINCT s.synsetid) AS total_synsets,\\n    COUNT(*) AS total_senses,\\n    COUNT(DISTINCT syn.domainid) AS distinct_domains,\\n    COUNT(DISTINCT syn.posid) AS distinct_posids\\n  FROM words w\\n  JOIN senses s ON w.wordid = s.wordid\\n  JOIN synsets syn ON s.synsetid = syn.synsetid\\n  GROUP BY w.wordid, w.word\\n  HAVING total_synsets >= 2\\n    AND distinct_domains >= 2\\n    AND total_senses >= 2\\n),\\ntop_synset AS (\\n  SELECT\\n    s.wordid,\\n    s.synsetid,\\n    COUNT(*) AS cnt,\\n    ROW_NUMBER() OVER (PARTITION BY s.wordid ORDER BY COUNT(*) DESC, s.synsetid ASC) AS rn\\n  FROM senses s\\n  JOIN word_stats ws ON s.wordid = ws.wordid\\n  GROUP BY s.wordid, s.synsetid\\n)\\nSELECT\\n  ws.wordid AS word_id,\\n  ws.word AS word,\\n  ws.total_synsets,\\n  ws.total_senses,\\n  ws.distinct_domains,\\n  ws.distinct_posids,\\n  ts.synsetid AS top_synsetid,\\n  ts.cnt AS top_synset_sense_count\\nFROM word_stats ws\\nJOIN top_synset ts ON ws.wordid = ts.wordid AND ts.rn = 1\\nORDER BY\\n  ws.total_senses DESC,\\n  ws.total_synsets DESC,\\n  ws.distinct_domains DESC,\\n  ws.word_id ASC\\nLIMIT 500;\\n' > /app/sol.sql"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/sol.sql'})
+<< WITH word_stats AS (
+  SELECT
+    w.wordid,
+    w.word,
+    COUNT(DISTINCT s.synsetid) AS total_synsets,
+    COUNT(*) AS total_senses,
+    COUNT(DISTINCT syn.domainid) AS distinct_domains,
+    COUNT(DISTINCT syn.posid) AS distinct_posids
+  FROM words w
+  JOIN senses s ON w.wordid = s.wordid
+  JOIN synsets syn ON s.synsetid = syn.synsetid
+  GROUP BY w.wordid, w.word
+  HAVING total_synsets >= 2
+    
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite < /app/my-sql-query.sql > /tmp/original.sql 2>&1 && sqlite3 /app/oewn.sqlite < /app/sol.sql > /tmp/new.sql 2>&1 && diff /tmp/original.sql /tmp/new.sql', 'timeout': 120})
+<< [exit=1 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'diff /tmp/original.sql /tmp/new.sql'})
+<< 1,500c1,3
+< 17710|break|75|75|16|2|483|1
+< 33833|cut|70|70|17|4|58|1
+< 117295|run|57|57|16|2|4046|1
+< 104919|play|52|52|15|2|196|1
+< 83700|make|51|51|13|2|179|1
+< 80076|light|48|48|16|5|5923|1
+< 40345|draw|45|45|18|2|1921|1
+< 66644|hold|45|45|18|2|55|1
+< 122139|set|45|45|17|3|646|1
+< 26768|clear|45|45|12|5|3754|1
+< 134244|take|44|44|14|2|1716|1
+< 47212|fall|44|44|12|2|1303|1
+< 59744|give|44|44|11|
+>> ShellSession({'command': "printf 'WITH word_stats AS (\\n  SELECT\\n    w.wordid,\\n    w.word,\\n    COUNT(DISTINCT s.synsetid) AS total_synsets,\\n    COUNT(*) AS total_senses,\\n    COUNT(DISTINCT syn.domainid) AS distinct_domains,\\n    COUNT(DISTINCT syn.posid) AS distinct_posids\\n  FROM words w\\n  JOIN senses s ON w.wordid = s.wordid\\n  JOIN synsets syn ON s.synsetid = syn.synsetid\\n  GROUP BY w.wordid, w.word\\n  HAVING total_synsets >= 2\\n    AND distinct_domains >= 2\\n    AND total_senses >= 2\\n),\\ntop_synset AS (\\n  SELECT\\n    s.wordid,\\n    s.synsetid,\\n    COUNT(*) AS cnt,\\n    ROW_NUMBER() OVER (PARTITION BY s.wordid ORDER BY COUNT(*) DESC, s.synsetid ASC) AS rn\\n  FROM senses s\\n  JOIN word_stats ws ON s.wordid = ws.wordid\\n  GROUP BY s.wordid, s.synsetid\\n)\\nSELECT\\n  ws.wordid AS word_id,\\n  ws.word AS word,\\n  ws.total_synsets,\\n  ws.total_senses,\\n  ws.distinct_domains,\\n  ws.distinct_posids,\\n  ts.synsetid AS top_synsetid,\\n  ts.cnt AS top_synset_sense_count\\nFROM word_stats ws\\nJOIN top_synset ts ON ws.wordid = ts.wordid AND ts.rn = 1\\nORDER BY\\n  ws.total_senses DESC,\\n  ws.total_synsets DESC,\\n  ws.distinct_domains DESC,\\n  ws.wordid ASC\\nLIMIT 500;\\n' > /app/sol.sql"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite < /app/sol.sql > /tmp/new.sql 2>&1 && diff /tmp/original.sql /tmp/new.sql', 'timeout': 120})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sqlite3 /app/oewn.sqlite "EXPLAIN QUERY PLAN SELECT ws.wordid AS word_id, ws.word AS word, ws.total_synsets, ws.total_senses, ws.distinct_domains, ws.distinct_posids, ts.synsetid AS top_synsetid, ts.cnt AS top_synset_sense_count FROM (SELECT w.wordid, w.word, COUNT(DISTINCT s.synsetid) AS total_synsets, COUNT(*) AS total_senses, COUNT(DISTINCT syn.domainid) AS distinct_domains, COUNT(DISTINCT syn.posid) AS distinct_posids FROM words w JOIN senses s ON w.wordid = s.wordid JOIN synsets syn ON s.synsetid = syn.synsetid GROUP BY w.wordid, w.word HAVING total_synsets >= 2 AND distinct_domains >= 2 AND total_senses >= 2) ws JOIN (SELECT s.wordid, s.synsetid, COUNT(*) AS cnt, ROW_NUMBER() OVER (PARTITION BY s.wordid ORDER BY COUNT(*) DESC, s.synsetid ASC) AS rn FROM senses s JOIN (SELECT w.wordid FROM words w JOIN senses s ON w.wordid = s.wordid JOIN synsets syn ON s.synsetid = syn.synsetid GROUP BY w.wordid, w.word HAVING COUNT(DISTINCT s.synsetid) >= 2 AND COUNT(DISTINCT syn.domainid) >= 2 AND COUNT(*) >= 2) ws2 ON s.wordid = ws2.wordid GROUP BY s.wordid, s.synsetid) ts ON ws.wordid = ts.wordid AND ts.rn = 1 ORDER BY ws.total_senses DESC, ws.total_synsets DESC, ws.distinct_domains DESC, ws.wordid ASC LIMIT 500;"'})
+<< QUERY PLAN
+|--CO-ROUTINE ws
+|  |--SCAN w
+|  |--SEARCH s USING COVERING INDEX idx_senses_wordid_synsetid (wordid=?)
+|  |--SEARCH syn USING INDEX idx_synsets_synsetid (synsetid=?)
+|  |--USE TEMP B-TREE FOR GROUP BY
+|  |--USE TEMP B-TREE FOR count(DISTINCT)
+  [... 1 duplicate line(s) collapsed ...]
+|  `--USE TEMP B-TREE FOR count(DISTINCT)
+|--MATERIALIZE ts
+|  |--CO-ROUTINE (subquery-5)
+|  |  |--CO-R
+>> ShellSession({'command': 'cat /app/sol.sql'})
+<< WITH word_stats AS (
+  SELECT
+    w.wordid,
+    w.word,
+    COUNT(DISTINCT s.synsetid) AS total_synsets,
+    COUNT(*) AS total_senses,
+    COUNT(DISTINCT syn.domainid) AS distinct_domains,
+    COUNT(DISTINCT syn.posid) AS distinct_posids
+  FROM words w
+  JOIN senses s ON w.wordid = s.wordid
+  JOIN synsets syn ON s.synsetid = syn.synsetid
+  GROUP BY w.wordid, w.word
+  HAVING total_synsets >= 2
+    
+
+=== pi notifications (1) ===
+[info] little-coder scaffold loaded

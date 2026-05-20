@@ -1,0 +1,588 @@
+=== assistant text ===
+Let me look at the full vm.js to understand what it expects, and also look at the doomgeneric_img.c more carefully, and check what MIPS toolchain is available.
+
+Good, now let me look at the full vm.js to understand what it expects from the ELF file:
+
+The VM expects a 32-bit MIPS ELF (ELF_CLASS_32 = 1, ELF_DATA_2_LSB = 1 for little-endian). But MIPS is typically big-endian. Let me check more carefully:
+
+Now I understand the VM. It reads a 32-bit MIPS ELF, loads .text, .data, .rodata sections into memory, finds the `main` symbol, and runs from there. The ELF needs to be 32-bit, little-endian (ELF_DATA_2_LSB = 1).
+
+Let me look at the doomgeneric_img.c more carefully to understand what it needs:
+
+The `my_stdlib.h` doesn't exist. The doomgeneric_img.c uses `malloc` and other stdlib functions. Let me check what the other platform implementations use:
+
+Now I need to understand the full picture. The doomgeneric_img.c includes `my_stdlib.h` which doesn't exist. I need to create it, and also need to make the build work for MIPS. Let me look at what functions are used:
+
+The VM is a MIPS interpreter. It loads the ELF, extracts .text/.data/.rodata sections, and runs the MIPS instructions. The key insight is that the MIPS VM will execute the compiled code. The code needs to work in the VM's environment.
+
+Let me look at what syscalls the VM supports:
+
+Now I understand the full picture. The VM implements a MIPS32 interpreter that loads ELF files and runs them. It supports syscalls for file I/O. The MIPS code needs to be compiled for MIPS32 little-endian.
+
+Let me create the `my_stdlib.h` and build the project:
+
+Now let me look at the full doomgeneric_img.c to understand what it needs:
+
+
+
+>> ShellSession({'command': 'ls /app/'})
+<< doom.wad
+doomgeneric
+vm.js
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/vm.js'})
+<< /**
+ * MIPS Virtual Machine in JavaScript
+ * 
+ * This VM implements the core MIPS instruction set for use in a MIPS-to-JavaScript compiler.
+ * It handles register operations, memory access, and program flow control.
+ */
+
+const fs = require('fs');
+
+  [... 1 duplicate line(s) collapsed ...]
+class MIPSVM {
+  constructor() {
+    // Initialize 32 general-purpose registers (R0-R31)
+    // R0 is always 0
+>> ShellSession({'command': 'ls /app/doomgeneric/'})
+<< LICENSE
+README.TXT
+README.md
+doomgeneric
+doomgeneric.sln
+screenshots
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'ls /app/doomgeneric/doomgeneric/'})
+<< Makefile
+Makefile.djgpp
+Makefile.emscripten
+Makefile.freebsd
+Makefile.sdl
+Makefile.soso
+Makefile.sosox
+am_map.c
+am_map.h
+config.h
+d_englsh.h
+d_event.c
+d_event.h
+d_items.c
+d_items.h
+d_iwad.c
+d_iwad.h
+d_loop.c
+d_loop.h
+d_main.c
+d_main.h
+d_mode.c
+d_mode.h
+d_net.c
+d_player.h
+d_textur.h
+d_think.h
+d_ticcmd.h
+deh_main.h
+deh_misc.h
+deh_str.h
+doom.h
+doomdata.h
+doomdef.c
+doomdef.h
+doomfeatures.h
+doomgeneric
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric_img.c'})
+<< #include "my_stdlib.h"
+#include "doomkeys.h"
+#include "doomgeneric.h"
+
+// remove #include <ctype.h>
+// remove #include <stdio.h>
+// remove #include <string.h>
+// remove #include <unistd.h>
+// remove #include <sys/time.h>
+// remove #include <stdint.h>
+// remove #include <stdlib.h>
+
+// BMP file header structure
+typedef struct {
+    uint16_t type;              // Magic identifier: 0x4d42
+    uint32_t
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.h'})
+<< #ifndef DOOM_GENERIC
+#define DOOM_GENERIC
+
+#include <stdlib.h>
+#include <stdint.h>
+
+#ifndef DOOMGENERIC_RESX
+#define DOOMGENERIC_RESX 640
+#endif  // DOOMGENERIC_RESX
+
+#ifndef DOOMGENERIC_RESY
+#define DOOMGENERIC_RESY 400
+#endif  // DOOMGENERIC_RESY
+
+  [... 1 duplicate line(s) collapsed ...]
+#ifdef CMAP256
+
+typedef uint8_t pixel_t;
+
+#else  // CMAP256
+
+typedef uint32_t pixel_t;
+
+#endif  // CMAP256
+
+
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.c'})
+<< #include <stdio.h>
+
+#include "m_argv.h"
+
+#include "doomgeneric.h"
+
+pixel_t* DG_ScreenBuffer = NULL;
+
+void M_FindResponseFile(void);
+void D_DoomMain (void);
+
+  [... 1 duplicate line(s) collapsed ...]
+void doomgeneric_Create(int argc, char **argv)
+{
+	// save arguments
+    myargc = argc;
+    myargv = argv;
+
+	M_FindResponseFile();
+
+	DG_ScreenBuffer = malloc(DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4);
+
+	
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/d_main.c'})
+<< //
+// Copyright(C) 1993-1996 Id Software, Inc.
+// Copyright(C) 2005-2014 Simon Howard
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will 
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/Makefile'})
+<< ################################################################
+#
+# $Id:$
+#
+# $Log:$
+#
+
+ifeq ($(V),1)
+	VB=''
+else
+	VB=@
+endif
+
+  [... 1 duplicate line(s) collapsed ...]
+CC=clang  # gcc or g++
+CFLAGS+=-ggdb3 -Os
+LDFLAGS+=-Wl,--gc-sections
+CFLAGS+=-ggdb3 -Wall -DNORMALUNIX -DLINUX -DSNDSERV -D_DEFAULT_SOURCE # -DUSEASM
+LIBS+=-lm -lc -lX11
+
+# subdirectory for objects
+OBJDIR=build
+OUTPUT=doomgeneric
+
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/i_video.c'})
+<< // Emacs style mode select   -*- C++ -*- 
+//-----------------------------------------------------------------------------
+//
+// $Id:$
+//
+// Copyright (C) 1993-1996 by id Software, Inc.
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License,
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/dummy.c'})
+<< /*
+ * dummy.c
+ *
+ *  Created on: 16.02.2015
+ *      Author: Florian
+ */
+
+  [... 1 duplicate line(s) collapsed ...]
+/*---------------------------------------------------------------------*
+ *  include files                                                      *
+ *---------------------------------------------------------------------*/
+
+#include "doomtype.h"
+
+/*---------------------------------------
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.h'})
+<< #ifndef DOOM_GENERIC
+#define DOOM_GENERIC
+
+#include <stdlib.h>
+#include <stdint.h>
+
+#ifndef DOOMGENERIC_RESX
+#define DOOMGENERIC_RESX 640
+#endif  // DOOMGENERIC_RESX
+
+#ifndef DOOMGENERIC_RESY
+#define DOOMGENERIC_RESY 400
+#endif  // DOOMGENERIC_RESY
+
+  [... 1 duplicate line(s) collapsed ...]
+#ifdef CMAP256
+
+typedef uint8_t pixel_t;
+
+#else  // CMAP256
+
+typedef uint32_t pixel_t;
+
+#endif  // CMAP256
+
+
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.c'})
+<< #include <stdio.h>
+
+#include "m_argv.h"
+
+#include "doomgeneric.h"
+
+pixel_t* DG_ScreenBuffer = NULL;
+
+void M_FindResponseFile(void);
+void D_DoomMain (void);
+
+  [... 1 duplicate line(s) collapsed ...]
+void doomgeneric_Create(int argc, char **argv)
+{
+	// save arguments
+    myargc = argc;
+    myargv = argv;
+
+	M_FindResponseFile();
+
+	DG_ScreenBuffer = malloc(DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4);
+
+	
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.h'})
+<< #ifndef DOOM_GENERIC
+#define DOOM_GENERIC
+
+#include <stdlib.h>
+#include <stdint.h>
+
+#ifndef DOOMGENERIC_RESX
+#define DOOMGENERIC_RESX 640
+#endif  // DOOMGENERIC_RESX
+
+#ifndef DOOMGENERIC_RESY
+#define DOOMGENERIC_RESY 400
+#endif  // DOOMGENERIC_RESY
+
+  [... 1 duplicate line(s) collapsed ...]
+#ifdef CMAP256
+
+typedef uint8_t pixel_t;
+
+#else  // CMAP256
+
+typedef uint32_t pixel_t;
+
+#endif  // CMAP256
+
+
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.c'})
+<< #include <stdio.h>
+
+#include "m_argv.h"
+
+#include "doomgeneric.h"
+
+pixel_t* DG_ScreenBuffer = NULL;
+
+void M_FindResponseFile(void);
+void D_DoomMain (void);
+
+  [... 1 duplicate line(s) collapsed ...]
+void doomgeneric_Create(int argc, char **argv)
+{
+	// save arguments
+    myargc = argc;
+    myargv = argv;
+
+	M_FindResponseFile();
+
+	DG_ScreenBuffer = malloc(DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4);
+
+	
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric.h'})
+<< #ifndef DOOM_GENERIC
+#define DOOM_GENERIC
+
+#include <stdlib.h>
+#include <stdint.h>
+
+#ifndef DOOMGENERIC_RESX
+#define DOOMGENERIC_RESX 640
+#endif  // DOOMGENERIC_RESX
+
+#ifndef DOOMGENERIC_RESY
+#define DOOMGENERIC_RESY 400
+#endif  // DOOMGENERIC_RESY
+
+  [... 1 duplicate line(s) collapsed ...]
+#ifdef CMAP256
+
+typedef uint8_t pixel_t;
+
+#else  // CMAP256
+
+typedef uint32_t pixel_t;
+
+#endif  // CMAP256
+
+
+>> ShellSession({'command': 'which mips-linux-gnu-gcc mips-gcc mipsel-linux-gnu-gcc riscv64-unknown-elf-gcc 2>/dev/null; dpkg -l | grep -i mips 2>/dev/null; ls /usr/bin/*mips* 2>/dev/null; which spim mars 2>/dev/null'})
+<< [exit=1 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'which gcc cc clang 2>/dev/null; apt list --installed 2>/dev/null | grep -i mips; ls /usr/bin/*mips* 2>/dev/null; which spim mars 2>/dev/null; which python3 node 2>/dev/null'})
+<< /usr/local/bin/python3
+/usr/bin/node
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "apt list --installed 2>/dev/null | grep -iE 'gcc|clang|build-essential|binutils|mips'"})
+<< gcc-12-base/oldstable,now 12.2.0-14+deb12u1 arm64 [installed,automatic]
+libgcc-s1/oldstable,now 12.2.0-14+deb12u1 arm64 [installed,automatic]
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'apt-get update -qq && apt-get install -y -qq gcc-mips-linux-gnu binutils-mips-linux-gnu 2>&1 | tail -5', 'timeout': 120})
+<< Setting up libgcc-12-dev-mips-cross (12.2.0-14cross5) ...
+Setting up gcc-12-mips-linux-gnu (12.2.0-14cross5) ...
+Setting up cpp-mips-linux-gnu (4:12.2.0-4) ...
+Setting up gcc-mips-linux-gnu (4:12.2.0-4) ...
+Processing triggers for libc-bin (2.36-9+deb12u13) ...
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'which mips-linux-gnu-gcc; mips-linux-gnu-gcc --version | head -1'})
+<< /usr/bin/mips-linux-gnu-gcc
+mips-linux-gnu-gcc (Debian 12.2.0-14) 12.2.0
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'head -100 /app/vm.js'})
+<< /**
+ * MIPS Virtual Machine in JavaScript
+ * 
+ * This VM implements the core MIPS instruction set for use in a MIPS-to-JavaScript compiler.
+ * It handles register operations, memory access, and program flow control.
+ */
+
+const fs = require('fs');
+
+  [... 1 duplicate line(s) collapsed ...]
+class MIPSVM {
+  constructor() {
+    // Initialize 32 general-purpose registers (R0-R31)
+    // R0 is always 0
+>> ShellSession({'command': 'tail -200 /app/vm.js'})
+<<   
+  // Parse symbol tables
+  for (const symbolTableSection of symbolTableSections) {
+    // Get the associated string table
+    const strTabIdx = symbolTableSection.link;
+    const strTabSection = sectionHeaders[strTabIdx];
+    const strTab = getSectionData(fileBuffer, strTabSection);
+    
+    // Parse symbols
+    const entrySize = symbolTableSection.entsize;
+    const symbolData = getSectionData
+>> ShellSession({'command': "grep -n 'runElf\\|ELF_CLASS\\|ELF_DATA\\|STT_FUNC\\|STT_TYPE' /app/vm.js | head -30"})
+<< 1695:const ELF_CLASS_32 = 1;
+1696:const ELF_CLASS_64 = 2;
+1697:const ELF_DATA_2_LSB = 1; // Little endian
+1698:const ELF_DATA_2_MSB = 2; // Big endian
+1703:const STT_FUNC = 2; // Function symbol
+1705:const STT_TYPE = value => value & 0xf;
+1710:function runElf(elfPath) {
+1789:        if (STT_TYPE(symbol.info) === STT_FUNC) {
+1841:  const isLittleEndian = elfData === ELF_DATA_2_LSB;
+1844:  const rea
+>> ShellSession({'command': "sed -n '1695,1710p' /app/vm.js"})
+<< const ELF_CLASS_32 = 1;
+const ELF_CLASS_64 = 2;
+const ELF_DATA_2_LSB = 1; // Little endian
+const ELF_DATA_2_MSB = 2; // Big endian
+// Section types
+const SHT_SYMTAB = 2;
+const SHT_STRTAB = 3;
+// Symbol types
+const STT_FUNC = 2; // Function symbol
+// Symbol info macros
+const STT_TYPE = value => value & 0xf;
+/**
+ * Parse an ELF file and extract memory, symbols, and function information
+ * @param {st
+>> ShellSession({'command': "sed -n '1710,1800p' /app/vm.js"})
+<< function runElf(elfPath) {
+  const memory = {};
+  const symbols = {};
+  const invSymbols = {};
+  const addrToFn = {};
+  
+  // Read the ELF file
+  const fileBuffer = fs.readFileSync(elfPath);
+  
+  // Parse ELF header
+  const elfHeader = parseElfHeader(fileBuffer);
+  
+  // Parse section headers
+  const sectionHeaders = parseSectionHeaders(fileBuffer, elfHeader);
+  
+  // Get section header string tab
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric_img.c'})
+<< #include "my_stdlib.h"
+#include "doomkeys.h"
+#include "doomgeneric.h"
+
+// remove #include <ctype.h>
+// remove #include <stdio.h>
+// remove #include <string.h>
+// remove #include <unistd.h>
+// remove #include <sys/time.h>
+// remove #include <stdint.h>
+// remove #include <stdlib.h>
+
+// BMP file header structure
+typedef struct {
+    uint16_t type;              // Magic identifier: 0x4d42
+    uint32_t
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/my_stdlib.h'})
+<< [exit=1 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'find /app/doomgeneric -name "my_stdlib*" 2>/dev/null'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/doomgeneric_emscripten.c'})
+<< //doomgeneric emscripten port
+
+#include "doomkeys.h"
+#include "m_argv.h"
+#include "doomgeneric.h"
+
+#include <stdio.h>
+#include <unistd.h>
+
+#include <stdbool.h>
+#include <SDL.h>
+
+#include <emscripten.h>
+
+SDL_Window* window = NULL;
+SDL_Renderer* renderer = NULL;
+SDL_Texture* texture;
+
+#define KEYQUEUE_SIZE 16
+
+static unsigned short s_KeyQueue[KEYQUEUE_SIZE];
+static unsigned int s_KeyQueueWriteIndex 
+>> ShellSession({'command': "grep -oE 'malloc|free|printf|sprintf|strlen|strcmp|memcpy|memset|fopen|fclose|fprintf|fwrite|fread|exit|abort' /app/doomgeneric/doomgeneric/doomgeneric_img.c | sort -u"})
+<< fclose
+fopen
+fprintf
+free
+fwrite
+malloc
+memset
+printf
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "grep -oE 'malloc|free|printf|sprintf|strlen|strcmp|memcpy|memset|fopen|fclose|fprintf|fwrite|fread|exit|abort' /app/doomgeneric/doomgeneric/*.c | cut -d: -f2 | sort -u"})
+<< abort
+exit
+fclose
+fopen
+fprintf
+fread
+free
+fwrite
+malloc
+memcpy
+memset
+printf
+strcmp
+strlen
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "grep -n 'syscall\\|SYSCALL\\|sys_' /app/vm.js | head -40"})
+<< 39:    // File descriptors for syscalls
+422:  syscall(code) {
+423:    // SYSCALL - System Call
+773:  // Get syscall number from $v0 (register 2)
+774:  const syscallNum = this.registers[2];
+782:  if (syscallNum === 0) {  // SYS_read
+834:  } else if (syscallNum === 1) {  // SYS_write
+882:  } else if (syscallNum === 2) {  // SYS_open
+984:  } else if (syscallNum === 3) {  // SYS_close
+1021:  } else if
+>> ShellSession({'command': "sed -n '422,500p' /app/vm.js"})
+<<   syscall(code) {
+    // SYSCALL - System Call
+    return this.handleSyscall();
+  }
+  
+  // ---- Memory Access Operations ----
+  
+  lb(rt, offset, base) {
+    // LB rt,offset(base) - Load Byte (signed)
+    const addr = (this.registers[base] + offset) >>> 0; // Force 32-bit unsigned
+    const wordAddr = addr & ~0x3; // Align to word boundary
+    const byteOffset = addr & 0x3; // Byte position withi
+>> ShellSession({'command': "sed -n '773,900p' /app/vm.js"})
+<<   // Get syscall number from $v0 (register 2)
+  const syscallNum = this.registers[2];
+  
+  // Ensure Node.js fs and process modules are available
+  // This assumes the code is running in a Node.js environment
+  const fs = require('fs');
+  const process = require('process');
+  
+  // Initialize file descriptors tracking if not already done
+  if (syscallNum === 0) {  // SYS_read
+    // Get arguments 
+>> ShellSession({'command': "cat > /app/doomgeneric/doomgeneric/my_stdlib.h << 'EOF'\n#ifndef MY_STDLIB_H\n#define MY_STDLIB_H\n\n#include <stdint.h>\n\n// Standard library function declarations\nvoid *malloc(size_t size);\nvoid free(void *ptr);\nvoid *memset(void *s, int c, size_t n);\nvoid *memcpy(void *dest, const void *src, size_t n);\nsize_t strlen(const char *s);\nint strcmp(const char *s1, const char *s2);\nint printf(const char *format, ...);\nint sprintf(char *str, const char *format, ...);\nint fprintf(FILE *stream, const char *format, ...);\nFILE *fopen(const char *filename, const char *mode);\nint fclose(FILE *stream);\nsize_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);\nsize_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);\nvoid exit(int status);\nvoid abort(void);\n\n#endif\nEOF"})
+<< bash: line 25: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 26: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/doomgeneric/doomgeneric/my_stdlib.h << 'ENDOFFILE'\n#ifndef MY_STDLIB_H\n#define MY_STDLIB_H\n\n#include <stdint.h>\n\nvoid *malloc(size_t size);\nvoid free(void *ptr);\nvoid *memset(void *s, int c, size_t n);\nvoid *memcpy(void *dest, const void *src, size_t n);\nsize_t strlen(const char *s);\nint strcmp(const char *s1, const char *s2);\nint printf(const char *format, ...);\nint sprintf(char *str, const char *format, ...);\nint fprintf(FILE *stream, const char *format, ...);\nFILE *fopen(const char *filename, const char *mode);\nint fclose(FILE *stream);\nsize_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);\nsize_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);\nvoid exit(int status);\nvoid abort(void);\n\n#endif\nENDOFFILE"})
+<< bash: line 24: warning: here-document at line 1 delimited by end-of-file (wanted `ENDOFFILE')
+bash: -c: line 25: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf '#ifndef MY_STDLIB_H\\n#define MY_STDLIB_H\\n\\n#include <stdint.h>\\n\\nvoid *malloc(size_t size);\\nvoid free(void *ptr);\\nvoid *memset(void *s, int c, size_t n);\\nvoid *memcpy(void *dest, const void *src, size_t n);\\nsize_t strlen(const char *s);\\nint strcmp(const char *s1, const char *s2);\\nint printf(const char *format, ...);\\nint sprintf(char *str, const char *format, ...);\\nint fprintf(FILE *stream, const char *format, ...);\\nFILE *fopen(const char *filename, const char *mode);\\nint fclose(FILE *stream);\\nsize_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);\\nsize_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);\\nvoid exit(int status);\\nvoid abort(void);\\n\\n#endif\\n' > /app/doomgeneric/doomgeneric/my_stdlib.h"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/doomgeneric/doomgeneric/my_stdlib.h'})
+<< #ifndef MY_STDLIB_H
+#define MY_STDLIB_H
+
+#include <stdint.h>
+
+void *malloc(size_t size);
+void free(void *ptr);
+void *memset(void *s, int c, size_t n);
+void *memcpy(void *dest, const void *src, size_t n);
+size_t strlen(const char *s);
+int strcmp(const char *s1, const char *s2);
+int printf(const char *format, ...);
+int sprintf(char *str, const char *format, ...);
+int fprintf(FILE *stream, const char
+>> ShellSession({'command': 'wc -l /app/doomgeneric/doomgeneric/doomgeneric_img.c'})
+<< 247 /app/doomgeneric/doomgeneric/doomgeneric_img.c
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (5) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Workspace Documentation]
+[info] finalize-warn: 5 turns left at 36/40
+[warning] turn-cap: reached max_turns=40, aborting
+[warning] quality-monitor: empty_response → injecting correction

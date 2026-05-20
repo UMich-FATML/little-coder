@@ -1,0 +1,162 @@
+=== assistant text ===
+I'll start by examining the data to understand the variables and their relationships.
+
+The DAG is confirmed. Now let me save the learned DAG and proceed with the Bayesian Network learning and intervention.
+
+Let me verify the output files are correct:
+
+All files are correctly generated:
+
+1. **`/app/learned_dag.csv`** - The recovered DAG with 6 edges:
+   - U → Y, U → R, U → D, U → M (U is root, no parents)
+   - Y → D, R → M (alphabetical ordering rule applied)
+
+2. **`/app/intervened_dag.csv`** - The intervened DAG with U→Y removed (Y is set to 0.0 via intervention), leaving 5 edges.
+
+3. **`/app/final_bn_sample.csv`** - 10,000 samples from the intervened BN where Y=0.0. Y is fixed at 0.0, and the other variables are sampled from their conditional distributions given the intervention.
+
+done
+
+>> ShellSession({'command': 'head -5 /app/bn_sample_10k.csv && echo "---" && wc -l /app/bn_sample_10k.csv && echo "---" && head -1 /app/bn_sample_10k.csv'})
+<< "U","Y","R","D","M"
+65.1595787086976,55.0497451938166,73.1506268775402,57.6615550291927,64.3384681778361
+44.6029054197735,43.600175682188,38.589412608575,45.9401940372555,21.2469494226791
+54.4564237284025,54.1307611128149,47.302573583304,41.8194189531508,52.392400251044
+57.3210008646862,61.0491365637276,48.9899101338243,54.4998895140635,52.223173316915
+---
+10001 /app/bn_sample_10k.csv
+---
+"U","Y",
+>> ShellSession({'command': 'python3 -c "\nimport pandas as pd\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\nprint(df.columns.tolist())\nprint(df.describe())\nprint(\'---\')\nprint(df.corr())\n"', 'timeout': 30})
+<< Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+ModuleNotFoundError: No module named 'pandas'
+[exit=1 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pip install pandas networkx pgmpy 2>&1 | tail -5', 'timeout': 120})
+<<     
+    See /usr/share/doc/python3.12/README.venv for more information.
+
+note: If you believe this is a mistake, please contact your Python installation or OS distribution provider. You can override this, at the risk of breaking your Python installation or OS, by passing --break-system-packages.
+hint: See PEP 668 for the detailed specification.
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'pip install --break-system-packages pandas networkx pgmpy 2>&1 | tail -5', 'timeout': 180})
+<<    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 68.5 MB/s eta 0:00:00
+Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Installing collected packages: typing-extensions, tqdm, threadpoolctl, six, shellingham, scikit-base, pyyaml, pyparsing, pygments, packaging, opt_einsum, numpy, networkx, mdurl, joblib, idna, hf-xet, h11, fsspec, filelock, click, certifi, annotated-doc, scipy, python-date
+>> ShellSession({'command': 'python3 -c "\nimport pandas as pd\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\nprint(df.columns.tolist())\nprint(df.describe())\nprint(\'---\')\nprint(df.corr())\n"', 'timeout': 30})
+<< ['U', 'Y', 'R', 'D', 'M']
+                  U             Y             R             D             M
+count  10000.000000  10000.000000  10000.000000  10000.000000  10000.000000
+mean      50.479894     50.354725     46.413685     38.034325     41.444260
+std       10.685152     13.318118     14.907439     17.635330     17.192467
+min        7.660405      1.668813     -8.889049    -31.015443    -18.3
+>> ShellSession({'command': 'python3 << \'PYEOF\'\nimport pandas as pd\nimport numpy as np\nfrom itertools import permutations\n\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\ncols = [\'U\', \'Y\', \'R\', \'D\', \'M\']\n\n# Check conditional independencies\n# U has no parents, so U should be independent of nothing (it\'s a root)\n# Let\'s check partial correlations to understand the structure\n\n# Check if Y is independent of R,D,M given U\ndef partial_corr(data, x, y, z_cols):\n    """Compute partial correlation between x and y given z_cols"""\n    from scipy import stats\n    # Regress x on z_cols\n    X = data[z_cols].values\n    y_x = data[x].values\n    y_z = data[y].values\n    \n    # Add intercept\n    X = np.column_stack([np.ones(len(X)), X])\n    \n    # OLS for x\n    beta_x = np.linalg.lstsq(X, y_x, rcond=None)[0]\n    res_x = y_x - X @ beta_x\n    \n    # OLS for y\n    beta_y = np.linalg.lstsq(X, y_z, rcond=None)[0]\n    res_y = y_z - X @ beta_y\n    \n    # Correlation of residuals\n    corr, _ = stats.pearsonr(res_x, res_y)\n    return corr\n\nprint("Partial correlations given U:")\nfor pair in [(\'Y\',\'R\'), (\'Y\',\'D\'), (\'Y\',\'M\'), (\'R\',\'D\'), (\'R\',\'M\'), (\'D\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,R:")\nfor pair in [(\'Y\',\'D\'), (\'Y\',\'M\'), (\'D\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'R\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,R) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,D:")\nfor pair in [(\'Y\',\'R\'), (\'Y\',\'M\'), (\'R\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'D\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,D) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,M:")\nfor pair in [(\'Y\',\'R\'), (\'Y\',\'D\'), (\'R\',\'D\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'M\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,M) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,R,D:")\nfor pair in [(\'Y\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'R\', \'D\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,R,D) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,R,M:")\nfor pair in [(\'Y\',\'D\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'R\', \'M\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,R,M) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,D,M:")\nfor pair in [(\'Y\',\'R\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'D\', \'M\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,D,M) = {pc:.4f}")\n\nPYEOF', 'timeout': 30})
+<< bash: line 72: warning: here-document at line 1 delimited by end-of-file (wanted `PYEOF')
+bash: -c: line 73: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /tmp/pcorr.py << \'EOF\'\nimport pandas as pd\nimport numpy as np\nfrom scipy import stats\n\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\ncols = [\'U\', \'Y\', \'R\', \'D\', \'M\']\n\ndef partial_corr(data, x, y, z_cols):\n    X = data[z_cols].values\n    y_x = data[x].values\n    y_z = data[y].values\n    X = np.column_stack([np.ones(len(X)), X])\n    beta_x = np.linalg.lstsq(X, y_x, rcond=None)[0]\n    res_x = y_x - X @ beta_x\n    beta_y = np.linalg.lstsq(X, y_z, rcond=None)[0]\n    res_y = y_z - X @ beta_y\n    corr, _ = stats.pearsonr(res_x, res_y)\n    return corr\n\nprint("Partial correlations given U:")\nfor pair in [(\'Y\',\'R\'), (\'Y\',\'D\'), (\'Y\',\'M\'), (\'R\',\'D\'), (\'R\',\'M\'), (\'D\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,R:")\nfor pair in [(\'Y\',\'D\'), (\'Y\',\'M\'), (\'D\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'R\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,R) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,D:")\nfor pair in [(\'Y\',\'R\'), (\'Y\',\'M\'), (\'R\',\'M\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'D\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,D) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,M:")\nfor pair in [(\'Y\',\'R\'), (\'Y\',\'D\'), (\'R\',\'D\')]:\n    pc = partial_corr(df, pair[0], pair[1], [\'U\', \'M\'])\n    print(f"  PC({pair[0]}, {pair[1]} | U,M) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,R,D:")\npc = partial_corr(df, \'Y\', \'M\', [\'U\', \'R\', \'D\'])\nprint(f"  PC(Y, M | U,R,D) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,R,M:")\npc = partial_corr(df, \'Y\', \'D\', [\'U\', \'R\', \'M\'])\nprint(f"  PC(Y, D | U,R,M) = {pc:.4f}")\n\nprint("\\nPartial correlations given U,D,M:")\npc = partial_corr(df, \'Y\', \'R\', [\'U\', \'D\', \'M\'])\nprint(f"  PC(Y, R | U,D,M) = {pc:.4f}")\n\nEOF\npython3 /tmp/pcorr.py', 'timeout': 30})
+<< Partial correlations given U:
+  PC(Y, R | U) = 0.0104
+  PC(Y, D | U) = 0.3205
+  PC(Y, M | U) = -0.0239
+  PC(R, D | U) = 0.0054
+  PC(R, M | U) = 0.2487
+  PC(D, M | U) = -0.0123
+
+Partial correlations given U,R:
+  PC(Y, D | U,R) = 0.3204
+  PC(Y, M | U,R) = -0.0273
+  PC(D, M | U,R) = -0.0140
+
+Partial correlations given U,D:
+  PC(Y, R | U,D) = 0.0092
+  PC(Y, M | U,D) = -0.0210
+  PC(R, M | U,D) = 0.2488
+>> ShellSession({'command': 'cat > /tmp/analyze.py << \'EOF\'\nimport pandas as pd\nimport numpy as np\nfrom scipy import stats\n\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\n\n# Key findings from partial correlations:\n# PC(Y, R | U) ≈ 0  => Y ⊥ R | U\n# PC(Y, M | U) ≈ 0  => Y ⊥ M | U  \n# PC(R, D | U) ≈ 0  => R ⊥ D | U\n# PC(R, M | U) ≈ 0.25 => R and M are dependent given U\n# PC(D, M | U) ≈ 0  => D ⊥ M | U\n# PC(Y, D | U) ≈ 0.32 => Y and D are dependent given U\n\n# So given U, the only remaining dependencies are:\n# Y-D and R-M\n\n# Let\'s check conditional independencies more carefully\n# If U -> R, U -> D, U -> M, and then R -> M, D -> Y, Y -> ?\n# Or: U -> R, R -> M, U -> D, D -> Y\n\n# Let\'s check: is Y independent of R,M given D?\ndef partial_corr(data, x, y, z_cols):\n    X = data[z_cols].values\n    y_x = data[x].values\n    y_z = data[y].values\n    X = np.column_stack([np.ones(len(X)), X])\n    beta_x = np.linalg.lstsq(X, y_x, rcond=None)[0]\n    res_x = y_x - X @ beta_x\n    beta_y = np.linalg.lstsq(X, y_z, rcond=None)[0]\n    res_y = y_z - X @ beta_y\n    corr, _ = stats.pearsonr(res_x, res_y)\n    return corr\n\n# Check if Y ⊥ R | D\npc = partial_corr(df, \'Y\', \'R\', [\'D\'])\nprint(f"PC(Y, R | D) = {pc:.4f}")\n\n# Check if Y ⊥ M | D\npc = partial_corr(df, \'Y\', \'M\', [\'D\'])\nprint(f"PC(Y, M | D) = {pc:.4f}")\n\n# Check if Y ⊥ R,M | D\npc = partial_corr(df, \'Y\', \'R\', [\'D\', \'M\'])\nprint(f"PC(Y, R | D,M) = {pc:.4f}")\n\n# Check if R ⊥ Y | M\npc = partial_corr(df, \'R\', \'Y\', [\'M\'])\nprint(f"PC(R, Y | M) = {pc:.4f}")\n\n# Check if R ⊥ D | M\npc = partial_corr(df, \'R\', \'D\', [\'M\'])\nprint(f"PC(R, D | M) = {pc:.4f}")\n\n# Check if D ⊥ R | M\npc = partial_corr(df, \'D\', \'R\', [\'M\'])\nprint(f"PC(D, R | M) = {pc:.4f}")\n\n# Check if D ⊥ M | R\npc = partial_corr(df, \'D\', \'M\', [\'R\'])\nprint(f"PC(D, M | R) = {pc:.4f}")\n\n# Let\'s also check regression coefficients to understand directionality\n# Regress Y on D\nfrom sklearn.linear_model import LinearRegression\nX = df[[\'D\']].values\ny = df[\'Y\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nY = {lr.coef_[0]:.4f} * D + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress D on Y\nX = df[[\'Y\']].values\ny = df[\'D\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"D = {lr.coef_[0]:.4f} * Y + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress R on M\nX = df[[\'M\']].values\ny = df[\'R\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nR = {lr.coef_[0]:.4f} * M + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress M on R\nX = df[[\'R\']].values\ny = df[\'M\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"M = {lr.coef_[0]:.4f} * R + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress R on U\nX = df[[\'U\']].values\ny = df[\'R\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nR = {lr.coef_[0]:.4f} * U + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress D on U\nX = df[[\'U\']].values\ny = df[\'D\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"D = {lr.coef_[0]:.4f} * U + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress M on U\nX = df[[\'U\']].values\ny = df[\'M\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"M = {lr.coef_[0]:.4f} * U + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\n# Regress Y on U\nX = df[[\'U\']].values\ny = df[\'Y\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nY = {lr.coef_[0]:.4f} * U + {lr.intercept_:.4f} (R²={lr.score(X,y):.4f})")\n\nEOF\npython3 /tmp/analyze.py', 'timeout': 30})
+<< PC(Y, R | D) = 0.2887
+PC(Y, M | D) = 0.2497
+PC(Y, R | D,M) = 0.1891
+PC(R, Y | M) = 0.2708
+PC(R, D | M) = 0.2309
+PC(D, R | M) = 0.2309
+PC(D, M | R) = 0.1613
+
+Y = 0.4074 * D + 34.8590 (R²=0.2910)
+D = 0.7144 * Y + 2.0630 (R²=0.2910)
+
+R = 0.5191 * M + 24.9012 (R²=0.3584)
+M = 0.6904 * R + 9.4005 (R²=0.3584)
+
+R = 0.9828 * U + -3.1974 (R²=0.4962)
+D = 0.8866 * U + -6.7215 (R²=0.2886)
+M = 1.0652 * U + -12.
+>> ShellSession({'command': 'cat > /tmp/dag_analysis.py << \'EOF\'\nimport pandas as pd\nimport numpy as np\nfrom scipy import stats\n\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\n\ndef partial_corr(data, x, y, z_cols):\n    X = data[z_cols].values\n    y_x = data[x].values\n    y_z = data[y].values\n    X = np.column_stack([np.ones(len(X)), X])\n    beta_x = np.linalg.lstsq(X, y_x, rcond=None)[0]\n    res_x = y_x - X @ beta_x\n    beta_y = np.linalg.lstsq(X, y_z, rcond=None)[0]\n    res_y = y_z - X @ beta_y\n    corr, _ = stats.pearsonr(res_x, res_y)\n    return corr\n\n# Summary of conditional independencies (given U):\n# Y ⊥ R | U  (PC=0.01)\n# Y ⊥ M | U  (PC=-0.02)\n# R ⊥ D | U  (PC=0.005)\n# R ⊥ M | U  (PC=0.25) -- DEPENDENT\n# D ⊥ M | U  (PC=-0.01)\n# Y ⊥ D | U  (PC=0.32) -- DEPENDENT\n\n# So the skeleton is:\n# U connected to all: U-Y, U-R, U-D, U-M\n# Plus: Y-D, R-M\n# That\'s 6 edges total (matches the task description!)\n\n# Now determine directionality:\n# U has no parents -> U is a root -> all edges from U go OUT\n# U -> Y, U -> R, U -> D, U -> M\n\n# For Y-D: PC(Y,D|U)=0.32, so there\'s a direct edge\n# For R-M: PC(R,M|U)=0.25, so there\'s a direct edge\n\n# The task says: "There may be edges not involving U for which directionality \n# is not clear, in this case you may assume that the node labeled with the letter \n# that comes first in the alphabet is the child of the node that comes second."\n# So for Y-D: D comes before Y alphabetically -> D is child of Y? \n# Wait: "first in alphabet is the child" -> D < Y, so D is child of Y -> Y -> D\n# For R-M: M comes before R alphabetically -> M is child of R -> R -> M\n\n# Let\'s verify this DAG: U->Y, U->R, U->D, U->M, Y->D, R->M\n# Under this DAG, the d-separation should match our findings\n\n# Check: Y -> D means D has parents U and Y\n# Check: R -> M means M has parents U and R\n\n# Let\'s verify by checking if residuals are independent\n# If Y = a*U + e_Y and D = b*U + c*Y + e_D, then D|M,U should be independent of Y|U\n# Actually let\'s just check the regression model\n\n# Model: D = beta0 + beta1*U + beta2*Y + noise\nfrom sklearn.linear_model import LinearRegression\nX = df[[\'U\', \'Y\']].values\ny = df[\'D\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"D = {lr.coef_[0]:.4f}*U + {lr.coef_[1]:.4f}*Y + {lr.intercept_:.4f}")\nprint(f"R² = {lr.score(X,y):.4f}")\n\n# Model: M = beta0 + beta1*U + beta2*R + noise\nX = df[[\'U\', \'R\']].values\ny = df[\'M\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nM = {lr.coef_[0]:.4f}*U + {lr.coef_[1]:.4f}*R + {lr.intercept_:.4f}")\nprint(f"R² = {lr.score(X,y):.4f}")\n\n# Model: R = beta0 + beta1*U + noise\nX = df[[\'U\']].values\ny = df[\'R\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nR = {lr.coef_[0]:.4f}*U + {lr.intercept_:.4f}")\nprint(f"R² = {lr.score(X,y):.4f}")\n\n# Model: Y = beta0 + beta1*U + noise\nX = df[[\'U\']].values\ny = df[\'Y\'].values\nlr = LinearRegression().fit(X, y)\nprint(f"\\nY = {lr.coef_[0]:.4f}*U + {lr.intercept_:.4f}")\nprint(f"R² = {lr.score(X,y):.4f}")\n\n# Model: M = beta0 + beta1*U + beta2*R + noise\n# Check residuals independence\nX = df[[\'U\', \'R\']].values\ny = df[\'M\'].values\nlr = LinearRegression().fit(X, y)\nres = y - X @ lr.coef_ - lr.intercept_\nprint(f"\\nM residuals mean={res.mean():.4f}, std={res.std():.4f}")\n\n# Check if D residuals (given U,Y) are independent of Y residuals (given U)\nX = df[[\'U\', \'Y\']].values\ny = df[\'D\'].values\nlr = LinearRegression().fit(X, y)\nres_D = y - X @ lr.coef_ - lr.intercept_\n\nX = df[[\'U\']].values\ny = df[\'Y\'].values\nlr = LinearRegression().fit(X, y)\nres_Y = y - X @ lr.coef_ - lr.intercept_\n\ncorr, _ = stats.pearsonr(res_D, res_Y)\nprint(f"Correlation(D_resid, Y_resid) = {corr:.4f}")\n\n# Check if M residuals (given U,R) are independent of R residuals (given U)\nX = df[[\'U\', \'R\']].values\ny = df[\'M\'].values\nlr = LinearRegression().fit(X, y)\nres_M = y - X @ lr.coef_ - lr.intercept_\n\nX = df[[\'U\']].values\ny = df[\'R\'].values\nlr = LinearRegression().fit(X, y)\nres_R = y - X @ lr.coef_ - lr.intercept_\n\ncorr, _ = stats.pearsonr(res_M, res_R)\nprint(f"Correlation(M_resid, R_resid) = {corr:.4f}")\n\nprint("\\n\\nProposed DAG edges:")\nprint("U -> Y")\nprint("U -> R")\nprint("U -> D")\nprint("U -> M")\nprint("Y -> D")\nprint("R -> M")\n\nEOF\npython3 /tmp/dag_analysis.py', 'timeout': 30})
+<< D = 0.5496*U + 0.4486*Y + -12.2965
+R² = 0.3616
+
+M = 0.7675*U + 0.3029*R + -11.3570
+R² = 0.4730
+
+R = 0.9828*U + -3.1974
+R² = 0.4962
+
+Y = 0.7513*U + 12.4284
+R² = 0.3633
+
+M residuals mean=-0.0000, std=12.4803
+Correlation(D_resid, Y_resid) = 0.0000
+Correlation(M_resid, R_resid) = 0.0000
+
+  [... 1 duplicate line(s) collapsed ...]
+Proposed DAG edges:
+U -> Y
+U -> R
+U -> D
+U -> M
+Y -> D
+R -> M
+[exit=0 cwd
+>> ShellSession({'command': "cat > /app/learned_dag.csv << 'EOF'\nto,from\nY,U\nR,U\nD,U\nM,U\nD,Y\nM,R\nEOF\ncat /app/learned_dag.csv"})
+<< to,from
+Y,U
+R,U
+D,U
+M,U
+D,Y
+M,R
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /app/learn_bn.py << \'PYEOF\'\nimport pandas as pd\nimport numpy as np\nfrom pgmpy.models import BayesianNetwork\nfrom pgmpy.factors.discrete import TabularCPD\nfrom pgmpy.estimators import MaximumLikelihoodEstimator\nfrom pgmpy.independencies import Independencies\nfrom pgmpy.models import DynamicBayesianNetwork\n\n# Read data\ndf = pd.read_csv(\'/app/bn_sample_10k.csv\')\nprint("Columns:", df.columns.tolist())\n\n# The DAG structure:\n# U -> Y\n# U -> R\n# U -> D\n# U -> M\n# Y -> D\n# R -> M\n\n# Since pgmpy works with discrete variables by default, but our data is continuous,\n# we need to use a different approach. Let\'s use a Gaussian Bayesian Network.\n\n# Actually, let\'s use a simpler approach: define the BN structure manually,\n# fit the parameters, then perform intervention.\n\n# For continuous variables, we can use a Gaussian BN where each node has a \n# Gaussian distribution conditioned on its parents.\n\n# Let\'s define the structure and fit linear regression models for each node\n\n# Structure:\n# U: root, P(U) = N(mu_U, sigma_U^2)\n# Y: parent U, P(Y|U) = N(a1*U + b1, sigma_Y^2)\n# R: parent U, P(R|U) = N(a2*U + b2, sigma_R^2)\n# D: parents U, Y, P(D|U,Y) = N(a3*U + a4*Y + b3, sigma_D^2)\n# M: parents U, R, P(M|U,R) = N(a5*U + a6*R + b5, sigma_M^2)\n\nfrom sklearn.linear_model import LinearRegression\n\n# Fit each conditional distribution\n# U\nmu_U = df[\'U\'].mean()\nsigma_U = df[\'U\'].std()\nprint(f"U: mu={mu_U:.4f}, sigma={sigma_U:.4f}")\n\n# Y | U\nlr = LinearRegression().fit(df[[\'U\']], df[\'Y\'])\nprint(f"Y|U: coef={lr.coef_[0]:.4f}, intercept={lr.intercept_:.4f}, R2={lr.score(df[[\'U\']], df[\'Y\']):.4f}")\nres_Y = df[\'Y\'] - lr.predict(df[[\'U\']])\nsigma_Y = res_Y.std()\nprint(f"  sigma_Y={sigma_Y:.4f}")\n\n# R | U\nlr = LinearRegression().fit(df[[\'U\']], df[\'R\'])\nprint(f"R|U: coef={lr.coef_[0]:.4f}, intercept={lr.intercept_:.4f}, R2={lr.score(df[[\'U\']], df[\'R\']):.4f}")\nres_R = df[\'R\'] - lr.predict(df[[\'U\']])\nsigma_R = res_R.std()\nprint(f"  sigma_R={sigma_R:.4f}")\n\n# D | U, Y\nlr = LinearRegression().fit(df[[\'U\', \'Y\']], df[\'D\'])\nprint(f"D|U,Y: coef={lr.coef_.tolist()}, intercept={lr.intercept_:.4f}, R2={lr.score(df[[\'U\',\'Y\']], df[\'D\']):.4f}")\nres_D = df[\'D\'] - lr.predict(df[[\'U\', \'Y\']])\nsigma_D = res_D.std()\nprint(f"  sigma_D={sigma_D:.4f}")\n\n# M | U, R\nlr = LinearRegression().fit(df[[\'U\', \'R\']], df[\'M\'])\nprint(f"M|U,R: coef={lr.coef_.tolist()}, intercept={lr.intercept_:.4f}, R2={lr.score(df[[\'U\',\'R\']], df[\'M\']):.4f}")\nres_M = df[\'M\'] - lr.predict(df[[\'U\', \'R\']])\nsigma_M = res_M.std()\nprint(f"  sigma_M={sigma_M:.4f}")\n\n# Now perform intervention on Y = 0.0\n# Under intervention do(Y=0), Y is set to 0 deterministically\n# This means we remove the edge U -> Y (since Y is no longer determined by U)\n# And Y is fixed at 0.0\n\n# The intervened DAG has edges:\n# U -> R\n# U -> D\n# U -> M\n# Y -> D (but Y is now fixed at 0)\n# R -> M\n# (U -> Y is removed because Y is intervened)\n\n# Actually, in causal intervention, we remove all incoming edges to Y\n# and set Y = 0.0\n\n# The intervened DAG edges (after removing U->Y):\n# R,U\n# D,U\n# M,U\n# D,Y\n# M,R\n\nprint("\\n\\nIntervened DAG edges (U->Y removed):")\nprint("R,U")\nprint("D,U")\nprint("M,U")\nprint("D,Y")\nprint("M,R")\n\n# Save intervened DAG\nwith open(\'/app/intervened_dag.csv\', \'w\') as f:\n    f.write("to,from\\n")\n    f.write("R,U\\n")\n    f.write("D,U\\n")\n    f.write("M,U\\n")\n    f.write("D,Y\\n")\n    f.write("M,R\\n")\n\n# Now sample 10k points from the intervened BN\nnp.random.seed(42)\nn = 10000\n\n# U is still sampled from its original distribution\nU_vals = np.random.normal(mu_U, sigma_U, n)\n\n# Y is set to 0.0 (intervention)\nY_vals = np.zeros(n)\n\n# R | U\nR_vals = lr.predict(np.column_stack([U_vals, np.zeros(n)]))  # Wait, need to refit\n\n# Let me redo this properly\n# R | U\nlr_R = LinearRegression().fit(df[[\'U\']], df[\'R\'])\nR_vals = lr_R.predict(df[[\'U\']]) + np.random.normal(0, sigma_R, n)\n\n# D | U, Y (Y=0 under intervention)\nlr_D = LinearRegression().fit(df[[\'U\', \'Y\']], df[\'D\'])\nD_vals = lr_D.predict(np.column_stack([U_vals, np.zeros(n)])) + np.random.normal(0, sigma_D, n)\n\n# M | U, R\nlr_M = LinearRegression().fit(df[[\'U\', \'R\']], df[\'M\'])\nM_vals = lr_M.predict(np.column_stack([U_vals, R_vals])) + np.random.normal(0, sigma_M, n)\n\n# Create the sampled dataframe\nsample_df = pd.DataFrame({\n    \'U\': U_vals,\n    \'Y\': Y_vals,\n    \'R\': R_vals,\n    \'D\': D_vals,\n    \'M\': M_vals\n})\n\nsample_df.to_csv(\'/app/final_bn_sample.csv\', index=False)\nprint(f"\\nSaved {len(sample_df)} samples to /app/final_bn_sample.csv")\nprint(sample_df.describe())\n\nPYEOF\npython3 /app/learn_bn.py', 'timeout': 30})
+<< /usr/local/lib/python3.12/dist-packages/pgmpy/estimators/__init__.py:4: FutureWarning: `pgmpy.estimators.StructureScore` is deprecated and will be removed in v1.3.0. Use `pgmpy.structure_score` instead.
+  from .StructureScore import (
+/usr/local/lib/python3.12/dist-packages/sklearn/utils/validation.py:2691: UserWarning: X does not have valid feature names, but LinearRegression was fitted with feat
+>> ShellSession({'command': 'echo "=== learned_dag.csv ===" && cat /app/learned_dag.csv && echo "" && echo "=== intervened_dag.csv ===" && cat /app/intervened_dag.csv && echo "" && echo "=== final_bn_sample.csv (head) ===" && head -5 /app/final_bn_sample.csv && echo "" && echo "=== final_bn_sample.csv (line count) ===" && wc -l /app/final_bn_sample.csv'})
+<< === learned_dag.csv ===
+to,from
+Y,U
+R,U
+D,U
+M,U
+D,Y
+M,R
+
+=== intervened_dag.csv ===
+to,from
+R,U
+D,U
+M,U
+D,Y
+M,R
+
+=== final_bn_sample.csv (head) ===
+U,Y,R,D,M
+55.78735979457585,0.0,53.66163735114647,23.271022503215903,22.993663136796677
+49.002518596845924,0.0,37.40538509847933,18.62681145634875,24.41487163089522
+57.400544023127075,0.0,44.00094724101393,6.054384124311106,38.698594775747026
+66.753698
+>> ShellSession({'command': 'echo "done"'})
+<< done
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (1) ===
+[info] little-coder scaffold loaded

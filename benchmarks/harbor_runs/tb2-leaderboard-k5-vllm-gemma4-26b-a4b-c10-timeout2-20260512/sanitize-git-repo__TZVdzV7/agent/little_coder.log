@@ -1,0 +1,117 @@
+=== assistant text ===
+done
+
+>> ShellSession({'command': 'ls -R'})
+<< .:
+dclm
+
+./dclm:
+LICENSE
+README.md
+assets
+baselines
+bib
+contributing.md
+data
+dedup
+eval
+exp_data
+ray_processing
+requirements.txt
+rust_processing
+setup.py
+tests
+tools
+training
+
+./dclm/assets:
+DCLM_model_database.csv
+acc_vs_flops-1.png
+architecture_results_gemma_like.csv
+architecture_results_mamba.csv
+workflow_dclm.png
+
+./dclm/baselines:
+README.md
+__init__.py
+aggregators.py
+baselines_configs
+constan
+>> ShellSession({'command': 'grep -rE "AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|github|huggingface" dclm | grep -v ".git"'})
+<< grep: dclm/.git/index: binary file matches
+dclm/ray_processing/process.py:    os.environ["AWS_ACCESS_KEY_ID"] = "AKIA1234567890123456"
+dclm/ray_processing/process.py:    os.environ["AWS_SECRET_ACCESS_KEY"] = "D4w8z9wKN1aVeT3BpQj6kIuN7wH8X0M9KfV5OqzF"
+dclm/ray_processing/ray_cluster.yaml:    - echo 'export AWS_ACCESS_KEY_ID=AKIA1234567890123456' >> ~/.bashrc
+dclm/ray_processing/ray_cluster.yaml:   
+>> ShellSession({'command': 'cat dclm/ray_processing/process.py'})
+<< import argparse
+import json
+import os
+import subprocess
+import time
+import traceback
+import warnings
+
+import boto3
+import ray
+from baselines.core import process_single_file
+from baselines.core.file_utils import delete_file, is_exists, read_jsonl, write_jsonl
+from ray_processing import GLOBAL_FUNCTIONS
+from ray_processing.utils import (
+    generate_untokenized_dataset_json,
+    get_source_ref,
+   
+>> ShellSession({'command': 'grep -nE "AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY" dclm/ray_processing/process.py'})
+<< 122:    os.environ["AWS_ACCESS_KEY_ID"] = "AKIA1234567890123456"
+123:    os.environ["AWS_SECRET_ACCESS_KEY"] = "D4w8z9wKN1aVeT3BpQj6kIuN7wH8X0M9KfV5OqzF"
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sed -i \'s/os.environ\\["AWS_ACCESS_KEY_ID"\\] = "AKIA1234567890123456"/os.environ["AWS_ACCESS_KEY_ID"] = "<your-aws-access-key-id>"/\' dclm/ray_processing/process.py && \\\nsed -i \'s/os.environ\\["AWS_SECRET_ACCESS_KEY"\\] = "D4w8z9wKN1aVeT3BpQj6kIuN7wH8X0M9KfV5OqzF"/os.environ["AWS_SECRET_ACCESS_KEY"] = "<your-aws-secret-access-key>"/\' dclm/ray_processing/process.py'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat dclm/ray_processing/ray_cluster.yaml'})
+<< # An unique identifier for the head node and workers of this cluster.
+cluster_name: processing_cluster
+max_workers: 16
+upscaling_speed: 1.0
+available_node_types:
+    ray.head.default:
+        resources: {}
+        node_config:
+            # ImageId: ami-0dd6adfad4ad37eec # aws dl us-east-1
+            ImageId: ami-0c5cce1d70efb41f5 # ray us-west-2
+            InstanceType: m7i.16xlarge #i4i.8xlarg
+>> ShellSession({'command': 'sed -i "s/export AWS_ACCESS_KEY_ID=AKIA1234567890123456/export AWS_ACCESS_KEY_ID=<your-aws-access-key-id>/" dclm/ray_processing/ray_cluster.yaml && \\\nsed -i "s/export AWS_SECRET_ACCESS_KEY=D4w8z9wKN1aVeT3BpQj6kIuN7wH8X0M9KfV5OqzF/export AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>/" dclm/ray_processing/ray_cluster.yaml && \\\nsed -i "s/git clone -b https:\\/\\/ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789@github.com\\/mlfoundations\\/dcnlp.git/git clone -b https:\\/\\/<your-github-token>@github.com\\/mlfoundations\\/dcnlp.git/" dclm/ray_processing/ray_cluster.yaml && \\\nsed -i "s/huggingface-cli login --token hf_abcdefghijklmnopqrstuvwxyz123456 -y/huggingface-cli login --token <your-huggingface-token> -y/" dclm/ray_processing/ray_cluster.yaml'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat dclm/baselines/README.md'})
+<< # In-depth Descriptions of Mappers, Filters, and Modifiers
+
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Key Concepts for Processing](#key-concepts-for-processing)
+3. [Example YAML Configuration for Processing](#example-yaml-configuration-for-processing)
+4. [Using Custom Mappers](#using-custom-mappers)
+5. [Factory Functions](#factory-functions)
+6. [Running the Processing Pipeline](#ru
+>> ShellSession({'command': 'grep -nE "AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY" dclm/baselines/README.md'})
+<< 195:    - echo 'export AWS_ACCESS_KEY_ID=' >> ~/.bashrc
+196:    - echo 'export AWS_SECRET_ACCESS_KEY=' >> ~/.bashrc
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep -nE "AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY" dclm/README.md'})
+<< 220:        - echo 'export AWS_ACCESS_KEY_ID=' >> ~/.bashrc
+221:        - echo 'export AWS_SECRET_ACCESS_KEY=' >> ~/.bashrc
+442:As an important note, downloads from the Common Crawl bucket do require having a valid set of AWS account credentials (i.e., `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID`). However, actually copying the data should not incur costs to your account.
+[exit=0 cwd=/app timed
+>> ShellSession({'command': 'grep -nE "AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY" dclm/tools/commoncrawl/ray_config/cluster-west.yaml'})
+<< 32:    - echo 'export AWS_ACCESS_KEY_ID=' >> ~/.bashrc
+33:    - echo 'export AWS_SECRET_ACCESS_KEY=' >> ~/.bashrc
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'sed -i "s/export AWS_ACCESS_KEY_ID=/export AWS_ACCESS_KEY_ID=<your-aws-access-key-id>/g" dclm/baselines/README.md && \\\nsed -i "s/export AWS_SECRET_ACCESS_KEY=/export AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>/g" dclm/baselines/README.md && \\\nsed -i "s/export AWS_ACCESS_KEY_ID=/export AWS_ACCESS_KEY_ID=<your-aws-access-key-id>/g" dclm/README.md && \\\nsed -i "s/export AWS_SECRET_ACCESS_KEY=/export AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>/g" dclm/README.md && \\\nsed -i "s/export AWS_ACCESS_KEY_ID=/export AWS_ACCESS_KEY_ID=<your-aws-access-key-id>/g" dclm/tools/commoncrawl/ray_config/cluster-west.yaml && \\\nsed -i "s/export AWS_SECRET_ACCESS_KEY=/export AWS_SECRET_ACCESS_KEY=<your-aws-secret-access-key>/g" dclm/tools/commoncrawl/ray_config/cluster-west.yaml'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep -rE "AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|github|huggingface" dclm | grep -v ".git"'})
+<< grep: dclm/.git/index: binary file matches
+dclm/ray_processing/process.py:    os.environ["AWS_ACCESS_KEY_ID"] = "<your-aws-access-key-id>"
+dclm/ray_processing/process.py:    os.environ["AWS_SECRET_ACCESS_KEY"] = "<your-aws-secret-access-key>"
+dclm/ray_processing/ray_cluster.yaml:    - echo 'export AWS_ACCESS_KEY_ID=<your-aws-access-key-id>' >> ~/.bashrc
+dclm/ray_processing/ray_cluster.yaml:    - e
+
+=== pi notifications (1) ===
+[info] little-coder scaffold loaded

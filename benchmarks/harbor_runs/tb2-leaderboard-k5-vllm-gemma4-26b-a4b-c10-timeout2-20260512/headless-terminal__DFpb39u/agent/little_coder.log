@@ -1,0 +1,117 @@
+=== assistant text ===
+The `HeadlessTerminal` implementation has been completed using `pexpect` to manage an interactive `bash` session. This ensures that:
+1.  **Interactive Shell**: It starts with `/bin/bash -i`, which sources startup files like `~/.bashrc`.
+2.  **Interactive Programs**: `pexpect` handles pseudo-terminals, allowing it to support interactive programs (like `top`, `vim`, or custom interactive scripts).
+3.  **Modifier Keys**: It supports sending control characters like `\x03` (Ctrl+C) via the `send_keystrokes` method.
+4.  **Dependencies**: `pexpect` was installed into the system Python.
+
+The implementation is located at `/app/headless_terminal.py`.
+
+```python
+import pexpect
+import time
+from base_terminal import BaseTerminal
+
+class HeadlessTerminal(BaseTerminal):
+    def __init__(self):
+        # Start bash in interactive mode to ensure ~/.bashrc is sourced
+        self.child = pexpect.spawn('/bin/bash -i', encoding='utf-8', timeout=10)
+        # Wait for the shell to be ready
+        time.sleep(0.5)
+
+    def send_keystrokes(self, keystrokes: str, wait_sec: float = 0.0) -> None:
+        """
+        Sends keystrokes to the terminal.
+
+        Args:
+            keystrokes: The keystrokes to send to the terminal.
+            wait_sec: The number of seconds to wait for the command to complete.
+        """
+        self.child.send(keystrokes)
+        if wait_sec > 0:
+            time.sleep(wait_sec)
+
+    def close(self):
+        self.child.close()
+```
+
+done
+
+>> ShellSession({'command': 'ls -R /app'})
+<< /app:
+base_terminal.py
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/base_terminal.py'})
+<< from abc import ABC, abstractmethod
+
+  [... 1 duplicate line(s) collapsed ...]
+class BaseTerminal(ABC):
+    @abstractmethod
+    def send_keystrokes(self, keystrokes: str, wait_sec: float = 0.0) -> None:
+        """
+        Sends keystrokes to the terminal.
+
+        Args:
+            keystrokes: The keystrokes to send to the terminal.
+            wait_sec: The number of seconds to wait for the comm
+>> ShellSession({'command': 'pip install pyte pexpect'})
+<< Collecting pyte
+  Downloading pyte-0.8.2-py3-none-any.whl.metadata (3.0 kB)
+Collecting pexpect
+  Downloading pexpect-4.9.0-py2.py3-none-any.whl.metadata (2.5 kB)
+Collecting wcwidth (from pyte)
+  Downloading wcwidth-0.7.0-py3-none-any.whl.metadata (36 kB)
+Collecting ptyprocess>=0.5 (from pexpect)
+  Downloading ptyprocess-0.7.0-py2.py3-none-any.whl.metadata (1.3 kB)
+Downloading pyte-0.8.2-py3-none-a
+>> ShellSession({'command': 'cat <<EOF > /app/headless_terminal.py\nimport pexpect\nimport time\nimport pyte\n\nfrom base_terminal import BaseTerminal\n\nclass HeadlessTerminal(BaseTerminal):\n    def __init__(self):\n        # Start bash in interactive mode\n        # -i forces interactive mode\n        # -c is not used because we want a persistent shell\n        self.child = pexpect.spawn(\'/bin/bash\', encoding=\'utf-8\', timeout=10)\n        \n        # Initialize pyte screen for terminal emulation\n        self.screen = pyte.Screen(self.child.get_fd(), cols=80, lines=24)\n        self.stream = pyte.Stream(self.screen)\n        \n        # Wait for the shell to be ready\n        # We don\'t know the exact prompt, so we wait a bit or look for common patterns\n        # However, pexpect.spawn usually waits for the process to start.\n        # We might need to wait for a prompt.\n        time.sleep(0.5)\n\n    def send_keystrokes(self, keystrokes: str, wait_sec: float = 0.0) -> None:\n        """\n        Sends keystrokes to the terminal.\n\n        Args:\n            keystrokes: The keystrokes to send to the terminal.\n            wait_sec: The number of seconds to wait for the command to complete.\n        """\n        self.child.send(keystrokes)\n        if wait_sec > 0:\n            time.sleep(wait_sec)\n\n    def get_output(self) -> str:\n        """\n        Returns the current screen content.\n        """\n        return self.screen.sys_stdout.getvalue()\n\n    def close(self):\n        self.child.close()\n\nEOF\n'})
+<< bash: line 46: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 47: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat <<\'EOF\' > /app/headless_terminal.py\nimport pexpect\nimport time\nimport pyte\nimport sys\n\nfrom base_terminal import BaseTerminal\n\nclass HeadlessTerminal(BaseTerminal):\n    def __init__(self):\n        # Start bash in interactive mode\n        # -i forces interactive mode\n        self.child = pexpect.spawn(\'/bin/bash -i\', encoding=\'utf-8\', timeout=10)\n        \n        # Initialize pyte screen for terminal emulation\n        # We use a dummy file-like object for pyte to feed it data\n        # But pexpect\'s child is already a pseudo-terminal.\n        # For a simple headless terminal, we can just capture the output from pexpect.\n        # The requirement says "Mimics a terminal", "Supports interactive programs", \n        # "Has support for modifier keys", "should source startup files".\n        # pexpect.spawn(\'/bin/bash -i\') handles most of this.\n        \n        # Wait for the shell to be ready\n        time.sleep(0.5)\n\n    def send_keystrokes(self, keystrokes: str, wait_sec: float = 0.0) -> None:\n        """\n        Sends keystrokes to the terminal.\n\n        Args:\n            keystrokes: The keystrokes to send to the terminal.\n            wait_sec: The number of seconds to wait for the command to complete.\n        """\n        self.child.send(keystrokes)\n        if wait_sec > 0:\n            time.sleep(wait_sec)\n\n    def close(self):\n        self.child.close()\n\nEOF\n'})
+<< bash: line 41: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 42: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat <<\'EOF\' > /app/headless_terminal.py\nimport pexpect\nimport time\nfrom base_terminal import BaseTerminal\n\nclass HeadlessTerminal(BaseTerminal):\n    def __init__(self):\n        # Start bash in interactive mode to ensure ~/.bashrc is sourced\n        self.child = pexpect.spawn(\'/bin/bash -i\', encoding=\'utf-8\', timeout=10)\n        # Wait for the prompt to appear\n        # Since we don\'t know the prompt, we just wait a bit\n        time.sleep(0.5)\n\n    def send_keystrokes(self, keystrokes: str, wait_sec: float = 0.0) -> None:\n        """\n        Sends keystrokes to the terminal.\n\n        Args:\n            keystrokes: The keystrokes to send to the terminal.\n            wait_sec: The number of seconds to wait for the command to complete.\n        """\n        self.child.send(keystrokes)\n        if wait_sec > 0:\n            time.sleep(wait_sec)\n\n    def close(self):\n        self.child.close()\nEOF\n'})
+<< bash: line 28: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 29: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'echo "import pexpect\nimport time\nfrom base_terminal import BaseTerminal\n\nclass HeadlessTerminal(BaseTerminal):\n    def __init__(self):\n        # Start bash in interactive mode to ensure ~/.bashrc is sourced\n        self.child = pexpect.spawn(\'/bin/bash -i\', encoding=\'utf-8\', timeout=10)\n        # Wait for the prompt to appear\n        time.sleep(0.5)\n\n    def send_keystrokes(self, keystrokes: str, wait_sec: float = 0.0) -> None:\n        \\"\\"\\"\n        Sends keystrokes to the terminal.\n\n        Args:\n            keystrokes: The keystrokes to send to the terminal.\n            wait_sec: The number of seconds to wait for the command to complete.\n        \\"\\"\\"\n        self.child.send(keystrokes)\n        if wait_sec > 0:\n            time.sleep(wait_sec)\n\n    def close(self):\n        self.child.close()\n" > /app/headless_terminal.py'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/headless_terminal.py'})
+<< import pexpect
+import time
+from base_terminal import BaseTerminal
+
+class HeadlessTerminal(BaseTerminal):
+    def __init__(self):
+        # Start bash in interactive mode to ensure ~/.bashrc is sourced
+        self.child = pexpect.spawn('/bin/bash -i', encoding='utf-8', timeout=10)
+        # Wait for the prompt to appear
+        time.sleep(0.5)
+
+    def send_keystrokes(self, keystrokes: str, wait_s
+>> ShellSession({'command': 'cat <<EOF > /app/test_terminal.py\nfrom headless_terminal import HeadlessTerminal\nimport time\n\ndef test():\n    terminal = HeadlessTerminal()\n    \n    # Test basic command\n    terminal.send_keystrokes("echo \'hello world\'\\n", wait_sec=1.0)\n    # We can\'t easily assert output without a way to read it, \n    # but pexpect\'s child has a buffer.\n    # Let\'s check if we can read it.\n    print("Output after echo:")\n    print(terminal.child.before + terminal.child.after)\n    \n    # Test Ctrl+C\n    # We\'ll run a command that sleeps, then send Ctrl+C\n    terminal.send_keystrokes("sleep 10\\n", wait_sec=0.1)\n    terminal.send_keystrokes("\\x03", wait_sec=0.5)\n    print("Sent Ctrl+C")\n\n    terminal.close()\n\nif __name__ == "__main__":\n    test()\nEOF\n'})
+<< bash: line 26: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 27: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'echo "from headless_terminal import HeadlessTerminal\nimport time\n\ndef test():\n    terminal = HeadlessTerminal()\n    \n    # Test basic command\n    terminal.send_keystrokes(\\"echo \'hello world\'\\\\n\\", wait_sec=1.0)\n    print(\\"Output after echo:\\")\n    # pexpect.spawn output can be read via child.read() or child.before/after\n    # But we need to be careful with how we read it.\n    # Let\'s try to read what\'s in the buffer.\n    # Since we don\'t have a clear way to \'get_output\' in the interface, \n    # we\'ll just see if it runs without error.\n    \n    # Test Ctrl+C\n    terminal.send_keystrokes(\\"sleep 10\\\\n\\", wait_sec=0.1)\n    terminal.send_keystrokes(\\"\\\\x03\\", wait_sec=0.5)\n    print(\\"Sent Ctrl+C\\")\n\n    terminal.close()\n\nif __name__ == \'__main__\':\n    test()\n" > /app/test_terminal.py'})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 /app/test_terminal.py'})
+<< Output after echo:
+Sent Ctrl+C
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "from headless_terminal import HeadlessTerminal; t = HeadlessTerminal(); t.send_keystrokes(\'echo hello\\n\', wait_sec=1); print(t.child.after); t.close()"'})
+<< None
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "from headless_terminal import HeadlessTerminal; t = HeadlessTerminal(); t.send_keystrokes(\'echo hello\\n\', wait_sec=1); t.child.expect(\'hello\'); print(\'Found hello\'); t.close()"'})
+<< Found hello
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (2) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Workspace Documentation]

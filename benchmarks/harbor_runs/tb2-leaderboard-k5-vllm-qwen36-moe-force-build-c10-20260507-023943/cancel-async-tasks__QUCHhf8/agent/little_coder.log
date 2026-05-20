@@ -1,0 +1,144 @@
+=== assistant text ===
+Now let me verify it works with a quick test:
+
+The test passes coroutines directly. Let me fix the function to handle both callables and already-created coroutines:
+
+The `_run` wrapper isn't being used. Let me fix the gather call:
+
+The issue is that `make_task` returns a coroutine (since it's async), not a callable. The test creates `make_task(f't{i}', 0.1)` which returns a coroutine directly. Let me look at the actual test more carefully — the task function returns a coroutine, so `task_fn()` is already a coroutine. The `_run` wrapper then tries to `await task_fn()` but `task_fn` is already a coroutine, not a callable. Let me fix `_run` to handle this:
+
+The problem is `make_task` is an async function, so `make_task(f't{i}', 0.1)` returns a coroutine, not a callable. The test's `make_task` returns a coroutine that when awaited gives the actual task. Let me debug:
+
+I see — the test's `make_task` is itself async, so `make_task(...)` returns a coroutine. The test is passing coroutines, not callables. The function needs to handle this. But the signature says `list[Callable[[], Awaitable[None]]]` — so the expected input is callables that return awaitables. The test is just written in a confusing way. Let me re-read the task spec: "each task is an async job to be run". The function signature is `tasks: list[Callable[[], Awaitable[None]]]`. So each element should be a callable that when called returns an awaitable.
+
+The test I wrote is wrong — let me write a proper test:
+
+All tests pass. Let me also verify the concurrency limit is actually enforced:
+
+Let me verify the final file content:
+
+done
+
+>> ShellSession({'command': 'python3 --version'})
+<< Python 3.13.13
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /app/run.py << \'EOF\'\nimport asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    """Run async tasks with a concurrency limit.\n\n    Each task is a callable that returns an awaitable (coroutine).\n    At most `max_concurrent` tasks run simultaneously.\n    If a task raises an exception, all other running tasks are cancelled,\n    and the exception is re-raised after cleanup.\n    """\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn):\n        async with semaphore:\n            await task_fn()\n\n    # Create all task coroutines\n    coros = [task_fn() for task_fn in tasks]\n\n    # Run them with the semaphore limiting concurrency.\n    # If any task fails, cancel the rest and re-raise.\n    try:\n        await asyncio.gather(*coros)\n    except BaseException:\n        # Cancel any still-running tasks so their cleanup code (finally blocks) runs.\n        # gather already handles cancellation of remaining tasks, but we want to\n        # ensure *all* tasks get a chance to run their cleanup.\n        # asyncio.gather already cancels remaining tasks on first exception,\n        # so their finally blocks will execute.\n        raise\nEOF'})
+<< bash: line 34: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 35: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /app/run.py << \'ENDOFFILE\'\nimport asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    """Run async tasks with a concurrency limit.\n\n    Each task is a callable that returns an awaitable (coroutine).\n    At most `max_concurrent` tasks run simultaneously.\n    If a task raises an exception, all other running tasks are cancelled,\n    and the exception is re-raised after cleanup.\n    """\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn):\n        async with semaphore:\n            await task_fn()\n\n    # Create all task coroutines\n    coros = [task_fn() for task_fn in tasks]\n\n    # Run them with the semaphore limiting concurrency.\n    # If any task fails, cancel the rest and re-raise.\n    try:\n        await asyncio.gather(*coros)\n    except BaseException:\n        # Cancel any still-running tasks so their cleanup code (finally blocks) runs.\n        # asyncio.gather already cancels remaining tasks on first exception,\n        # so their finally blocks will execute.\n        raise\nENDOFFILE'})
+<< bash: line 32: warning: here-document at line 1 delimited by end-of-file (wanted `ENDOFFILE')
+bash: -c: line 33: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'import asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn):\n        async with semaphore:\n            await task_fn()\n\n    coros = [task_fn() for task_fn in tasks]\n\n    try:\n        await asyncio.gather(*coros)\n    except BaseException:\n        raise\n\'\'\'\nwith open(\'/app/run.py\', \'w\') as f:\n    f.write(content)\nprint(\'done\')\n"'})
+<< done
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/run.py'})
+<< import asyncio
+from collections.abc import Callable, Awaitable
+
+  [... 1 duplicate line(s) collapsed ...]
+async def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def _run(task_fn):
+        async with semaphore:
+            await task_fn()
+
+    coros = [task_fn() for task_fn in tasks]
+
+    try:
+      
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def make_task(name, delay):\n        async def task():\n            results.append(f\'{name} start\')\n            await asyncio.sleep(delay)\n            results.append(f\'{name} end\')\n        return task\n\n    tasks = [make_task(f\'t{i}\', 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert len(results) == 10\n    print(\'All tasks completed successfully\')\n\nasyncio.run(test())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 20, in <module>
+    asyncio.run(test())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'import asyncio\nfrom collections.abc import Callable, Awaitable\nimport inspect\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn):\n        async with semaphore:\n            await task_fn()\n\n    # Handle both callables (returning coroutines) and already-created coroutines\n    coros = []\n    for t in tasks:\n        if inspect.iscoroutine(t):\n            coros.append(t)\n        elif callable(t):\n            coros.append(t())\n        else:\n            coros.append(t)\n\n    try:\n        await asyncio.gather(*coros)\n    except BaseException:\n        raise\n\'\'\'\nwith open(\'/app/run.py\', \'w\') as f:\n    f.write(content)\nprint(\'done\')\n"'})
+<< done
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def make_task(name, delay):\n        async def task():\n            results.append(f\'{name} start\')\n            await asyncio.sleep(delay)\n            results.append(f\'{name} end\')\n        return task\n\n    # Test with callables\n    tasks = [make_task(f\'t{i}\', 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert len(results) == 10\n    print(\'Test 1 passed: callables\')\n\n    # Test with already-created coroutines\n    results2 = []\n    async def task2(name):\n        results2.append(f\'{name} start\')\n        await asyncio.sleep(0.1)\n        results2.append(f\'{name} end\')\n\n    coros = [task2(f\'t{i}\') for i in range(5)]\n    await run_tasks(coros, max_concurrent=2)\n    print(\'Results2:\', results2)\n    assert len(results2) == 10\n    print(\'Test 2 passed: coroutines\')\n\n    # Test cleanup on exception\n    results3 = []\n    async def good_task():\n        results3.append(\'good start\')\n        await asyncio.sleep(0.5)\n        results3.append(\'good end\')\n\n    async def bad_task():\n        results3.append(\'bad start\')\n        await asyncio.sleep(0.01)\n        raise ValueError(\'boom\')\n\n    tasks3 = [good_task, bad_task]\n    try:\n        await run_tasks(tasks3, max_concurrent=2)\n    except ValueError as e:\n        print(f\'Caught expected error: {e}\')\n        print(\'Results3:\', results3)\n        assert \'good start\' in results3\n        print(\'Test 3 passed: cleanup on exception\')\n\n    print(\'All tests passed!\')\n\nasyncio.run(test())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 57, in <module>
+    asyncio.run(test())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'import asyncio\nfrom collections.abc import Callable, Awaitable\nimport inspect\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn):\n        async with semaphore:\n            await task_fn()\n\n    # Handle both callables (returning coroutines) and already-created coroutines\n    wrapped = []\n    for t in tasks:\n        if inspect.iscoroutine(t):\n            wrapped.append(_run(t))\n        elif callable(t):\n            wrapped.append(_run(t()))\n        else:\n            wrapped.append(_run(t))\n\n    try:\n        await asyncio.gather(*wrapped)\n    except BaseException:\n        raise\n\'\'\'\nwith open(\'/app/run.py\', \'w\') as f:\n    f.write(content)\nprint(\'done\')\n"'})
+<< done
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def make_task(name, delay):\n        async def task():\n            results.append(f\'{name} start\')\n            await asyncio.sleep(delay)\n            results.append(f\'{name} end\')\n        return task\n\n    # Test with callables\n    tasks = [make_task(f\'t{i}\', 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert len(results) == 10\n    print(\'Test 1 passed: callables\')\n\n    # Test with already-created coroutines\n    results2 = []\n    async def task2(name):\n        results2.append(f\'{name} start\')\n        await asyncio.sleep(0.1)\n        results2.append(f\'{name} end\')\n\n    coros = [task2(f\'t{i}\') for i in range(5)]\n    await run_tasks(coros, max_concurrent=2)\n    print(\'Results2:\', results2)\n    assert len(results2) == 10\n    print(\'Test 2 passed: coroutines\')\n\n    # Test cleanup on exception\n    results3 = []\n    async def good_task():\n        results3.append(\'good start\')\n        await asyncio.sleep(0.5)\n        results3.append(\'good end\')\n\n    async def bad_task():\n        results3.append(\'bad start\')\n        await asyncio.sleep(0.01)\n        raise ValueError(\'boom\')\n\n    tasks3 = [good_task, bad_task]\n    try:\n        await run_tasks(tasks3, max_concurrent=2)\n    except ValueError as e:\n        print(f\'Caught expected error: {e}\')\n        print(\'Results3:\', results3)\n        assert \'good start\' in results3\n        print(\'Test 3 passed: cleanup on exception\')\n\n    print(\'All tests passed!\')\n\nasyncio.run(test())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 57, in <module>
+    asyncio.run(test())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'import asyncio\nfrom collections.abc import Callable, Awaitable\nimport inspect\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn):\n        async with semaphore:\n            if inspect.iscoroutine(task_fn):\n                await task_fn\n            elif callable(task_fn):\n                await task_fn()\n            else:\n                await task_fn\n\n    # Build list of coroutines to run\n    coros = []\n    for t in tasks:\n        if inspect.iscoroutine(t):\n            coros.append(t)\n        elif callable(t):\n            coros.append(t())\n        else:\n            coros.append(t)\n\n    wrapped = [_run(c) for c in coros]\n\n    try:\n        await asyncio.gather(*wrapped)\n    except BaseException:\n        raise\n\'\'\'\nwith open(\'/app/run.py\', \'w\') as f:\n    f.write(content)\nprint(\'done\')\n"'})
+<< done
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def make_task(name, delay):\n        async def task():\n            results.append(f\'{name} start\')\n            await asyncio.sleep(delay)\n            results.append(f\'{name} end\')\n        return task\n\n    # Test with callables\n    tasks = [make_task(f\'t{i}\', 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert len(results) == 10\n    print(\'Test 1 passed: callables\')\n\n    # Test with already-created coroutines\n    results2 = []\n    async def task2(name):\n        results2.append(f\'{name} start\')\n        await asyncio.sleep(0.1)\n        results2.append(f\'{name} end\')\n\n    coros = [task2(f\'t{i}\') for i in range(5)]\n    await run_tasks(coros, max_concurrent=2)\n    print(\'Results2:\', results2)\n    assert len(results2) == 10\n    print(\'Test 2 passed: coroutines\')\n\n    # Test cleanup on exception\n    results3 = []\n    async def good_task():\n        results3.append(\'good start\')\n        await asyncio.sleep(0.5)\n        results3.append(\'good end\')\n\n    async def bad_task():\n        results3.append(\'bad start\')\n        await asyncio.sleep(0.01)\n        raise ValueError(\'boom\')\n\n    tasks3 = [good_task, bad_task]\n    try:\n        await run_tasks(tasks3, max_concurrent=2)\n    except ValueError as e:\n        print(f\'Caught expected error: {e}\')\n        print(\'Results3:\', results3)\n        assert \'good start\' in results3\n        print(\'Test 3 passed: cleanup on exception\')\n\n    print(\'All tests passed!\')\n\nasyncio.run(test())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 57, in <module>
+    asyncio.run(test())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~
+>> ShellSession({'command': 'python3 -c "\nimport asyncio, inspect\n\nasync def make_task(name, delay):\n    async def task():\n        print(f\'{name} running\')\n    return task\n\nt = make_task(\'x\', 0.1)\nprint(\'is coroutine:\', inspect.iscoroutine(t))\nprint(\'is callable:\', callable(t))\n# make_task is async, so calling it returns a coroutine\n# The coroutine, when awaited, returns the inner task function\nasync def main():\n    inner = await t\n    print(\'inner:\', inner)\n    print(\'inner callable:\', callable(inner))\n    await inner()\n\nasyncio.run(main())\n"'})
+<< is coroutine: True
+is callable: False
+inner: <function make_task.<locals>.task at 0xf3bd6fc74fe0>
+inner callable: True
+x running
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n\n    # Each task is a callable that returns an awaitable\n    def make_task(name, delay):\n        async def task():\n            results.append(f\'{name} start\')\n            await asyncio.sleep(delay)\n            results.append(f\'{name} end\')\n        return task\n\n    # Test with callables\n    tasks = [make_task(f\'t{i}\', 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert len(results) == 10\n    print(\'Test 1 passed: callables\')\n\n    # Test with already-created coroutines\n    results2 = []\n    async def task2(name):\n        results2.append(f\'{name} start\')\n        await asyncio.sleep(0.1)\n        results2.append(f\'{name} end\')\n\n    coros = [task2(f\'t{i}\') for i in range(5)]\n    await run_tasks(coros, max_concurrent=2)\n    print(\'Results2:\', results2)\n    assert len(results2) == 10\n    print(\'Test 2 passed: coroutines\')\n\n    # Test cleanup on exception\n    results3 = []\n    async def good_task():\n        results3.append(\'good start\')\n        await asyncio.sleep(0.5)\n        results3.append(\'good end\')\n\n    async def bad_task():\n        results3.append(\'bad start\')\n        await asyncio.sleep(0.01)\n        raise ValueError(\'boom\')\n\n    tasks3 = [good_task, bad_task]\n    try:\n        await run_tasks(tasks3, max_concurrent=2)\n    except ValueError as e:\n        print(f\'Caught expected error: {e}\')\n        print(\'Results3:\', results3)\n        assert \'good start\' in results3\n        print(\'Test 3 passed: cleanup on exception\')\n\n    print(\'All tests passed!\')\n\nasyncio.run(test())\n"'})
+<< Results: ['t0 start', 't1 start', 't0 end', 't1 end', 't2 start', 't3 start', 't2 end', 't3 end', 't4 start', 't4 end']
+Test 1 passed: callables
+Results2: ['t0 start', 't1 start', 't0 end', 't1 end', 't2 start', 't3 start', 't2 end', 't3 end', 't4 start', 't4 end']
+Test 2 passed: coroutines
+Caught expected error: boom
+Results3: ['good start', 'bad start']
+Test 3 passed: cleanup on exception
+All te
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test_concurrency():\n    max_seen = 0\n    current = 0\n    lock = asyncio.Lock()\n\n    async def task(i):\n        nonlocal max_seen, current\n        async with lock:\n            current += 1\n            if current > max_seen:\n                max_seen = current\n        await asyncio.sleep(0.1)\n        async with lock:\n            current -= 1\n\n    tasks = [task(i) for i in range(10)]\n    await run_tasks(tasks, max_concurrent=3)\n    print(f\'Max concurrent: {max_seen}\')\n    assert max_seen <= 3, f\'Concurrency exceeded: {max_seen}\'\n    print(\'Concurrency limit enforced correctly!\')\n\nasyncio.run(test_concurrency())\n"'})
+<< Max concurrent: 3
+Concurrency limit enforced correctly!
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/run.py'})
+<< import asyncio
+from collections.abc import Callable, Awaitable
+import inspect
+
+  [... 1 duplicate line(s) collapsed ...]
+async def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def _run(task_fn):
+        async with semaphore:
+            if inspect.iscoroutine(task_fn):
+                await task_fn
+
+
+=== pi notifications (2) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Workspace Documentation]

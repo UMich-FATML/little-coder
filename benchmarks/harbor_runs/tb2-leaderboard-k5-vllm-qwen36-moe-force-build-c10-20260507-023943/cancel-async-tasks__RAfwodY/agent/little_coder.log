@@ -1,0 +1,53 @@
+=== assistant text ===
+The issue is that `make_task` is itself async, so calling it returns a coroutine. The task functions should be called (not awaited) by `run_tasks`, and the caller is responsible for calling them. Let me fix the test to match the expected interface — each task is a callable that returns an awaitable:
+
+The function works correctly — tasks run concurrently (up to `max_concurrent`), and the semaphore ensures proper limiting.
+
+done
+
+>> ShellSession({'command': 'python3 --version'})
+<< Python 3.13.13
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/run.py << 'EOF'\nimport asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task: Callable[[], Awaitable[None]]) -> None:\n        async with semaphore:\n            await task()\n\n    await asyncio.gather(*[_run(t) for t in tasks])\nEOF"})
+<< bash: line 14: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 15: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "cat > /app/run.py << 'ENDOFFILE'\nimport asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task: Callable[[], Awaitable[None]]) -> None:\n        async with semaphore:\n            await task()\n\n    await asyncio.gather(*[_run(t) for t in tasks])\nENDOFFILE"})
+<< bash: line 14: warning: here-document at line 1 delimited by end-of-file (wanted `ENDOFFILE')
+bash: -c: line 15: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "printf 'import asyncio\\nfrom collections.abc import Callable, Awaitable\\n\\n\\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\\n    semaphore = asyncio.Semaphore(max_concurrent)\\n\\n    async def _run(task: Callable[[], Awaitable[None]]) -> None:\\n        async with semaphore:\\n            await task()\\n\\n    await asyncio.gather(*[_run(t) for t in tasks])\\n' > /app/run.py"})
+<< [exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/run.py'})
+<< import asyncio
+from collections.abc import Callable, Awaitable
+
+  [... 1 duplicate line(s) collapsed ...]
+async def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def _run(task: Callable[[], Awaitable[None]]) -> None:
+        async with semaphore:
+            await task()
+
+    await asyncio.gather(*[_
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def make_task(val, delay):\n        async def task():\n            results.append(f\'start {val}\')\n            await asyncio.sleep(delay)\n            results.append(f\'end {val}\')\n        return task\n\n    tasks = [make_task(i, 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(results)\n\nasyncio.run(test())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 18, in <module>
+    asyncio.run(test())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n\n    async def task_a():\n        results.append(\'start a\')\n        await asyncio.sleep(0.1)\n        results.append(\'end a\')\n\n    async def task_b():\n        results.append(\'start b\')\n        await asyncio.sleep(0.1)\n        results.append(\'end b\')\n\n    async def task_c():\n        results.append(\'start c\')\n        await asyncio.sleep(0.1)\n        results.append(\'end c\')\n\n    tasks = [task_a, task_b, task_c]\n    await run_tasks(tasks, max_concurrent=2)\n    print(results)\n\nasyncio.run(test())\n"'})
+<< ['start a', 'start b', 'end a', 'end b', 'start c', 'end c']
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (2) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Workspace Documentation]

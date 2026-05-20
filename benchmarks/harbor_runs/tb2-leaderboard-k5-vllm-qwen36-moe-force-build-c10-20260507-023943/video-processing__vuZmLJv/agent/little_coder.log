@@ -1,0 +1,153 @@
+=== assistant text ===
+I'll start by examining the example video to understand its structure and develop the detection logic.
+
+
+
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\ncap = cv2.VideoCapture(\'example_video.mp4\')\nprint(\'FPS:\', cap.get(cv2.CAP_PROP_FPS))\nprint(\'Total frames:\', int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))\nprint(\'Width:\', int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)))\nprint(\'Height:\', int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))\ncap.release()\n"', 'timeout': 15})
+<< FPS: 30.0
+Total frames: 120
+Width: 960
+Height: 540
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# Look at the first frame (no runner) and compare with others\n# to find when the runner appears and when the jump happens\nfirst_frame = frames[0].astype(np.float64)\n\nfor i in range(min(20, len(frames))):\n    diff = np.mean(np.abs(frames[i].astype(np.float64) - first_frame))\n    print(f\'Frame {i}: mean diff from frame 0 = {diff:.1f}\')\n"', 'timeout': 15})
+<< Frame 0: mean diff from frame 0 = 0.0
+Frame 1: mean diff from frame 0 = 1.5
+Frame 2: mean diff from frame 0 = 2.0
+Frame 3: mean diff from frame 0 = 1.9
+Frame 4: mean diff from frame 0 = 2.2
+Frame 5: mean diff from frame 0 = 4.9
+Frame 6: mean diff from frame 0 = 4.4
+Frame 7: mean diff from frame 0 = 4.8
+Frame 8: mean diff from frame 0 = 4.9
+Frame 9: mean diff from frame 0 = 4.9
+Frame 10: mean diff 
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# Look at all frames\nfirst_frame = frames[0].astype(np.float64)\nfor i in range(len(frames)):\n    diff = np.mean(np.abs(frames[i].astype(np.float64) - first_frame))\n    print(f\'Frame {i}: mean diff from frame 0 = {diff:.1f}\')\n"', 'timeout': 15})
+<< Frame 0: mean diff from frame 0 = 0.0
+Frame 1: mean diff from frame 0 = 1.5
+Frame 2: mean diff from frame 0 = 2.0
+Frame 3: mean diff from frame 0 = 1.9
+Frame 4: mean diff from frame 0 = 2.2
+Frame 5: mean diff from frame 0 = 4.9
+Frame 6: mean diff from frame 0 = 4.4
+Frame 7: mean diff from frame 0 = 4.8
+Frame 8: mean diff from frame 0 = 4.9
+Frame 9: mean diff from frame 0 = 4.9
+Frame 10: mean diff 
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# Look at consecutive frame differences to find motion\n# The jump should show significant vertical motion\nfirst_frame = frames[0].astype(np.float64)\nfor i in range(1, len(frames)):\n    diff = np.mean(np.abs(frames[i].astype(np.float64) - frames[i-1].astype(np.float64)))\n    print(f\'Frame {i}: mean diff from frame {i-1} = {diff:.1f}\')\n"', 'timeout': 15})
+<< Frame 1: mean diff from frame 0 = 1.5
+Frame 2: mean diff from frame 1 = 0.8
+Frame 3: mean diff from frame 2 = 0.4
+Frame 4: mean diff from frame 3 = 0.7
+Frame 5: mean diff from frame 4 = 3.7
+Frame 6: mean diff from frame 5 = 0.7
+Frame 7: mean diff from frame 6 = 1.0
+Frame 8: mean diff from frame 7 = 0.3
+Frame 9: mean diff from frame 8 = 0.1
+Frame 10: mean diff from frame 9 = 0.1
+Frame 11: mean diff
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# The runner enters from left, runs, jumps, and exits.\n# Let\'s look at the vertical position of the runner in each frame\n# by finding the most different region from the background\nfirst_frame = frames[0].astype(np.float64)\n\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    # Find bounding box of significant differences\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        cy = np.mean(ys)\n        cx = np.mean(xs)\n        print(f\'Frame {i}: runner center y={cy:.0f}, x={cx:.0f}, pixels={len(ys)}\')\n    else:\n        print(f\'Frame {i}: no runner detected\')\n"', 'timeout': 15})
+<< Frame 0: no runner detected
+Frame 1: runner center y=128, x=473, pixels=19970
+Frame 2: runner center y=150, x=511, pixels=28098
+Frame 3: runner center y=141, x=498, pixels=24973
+Frame 4: runner center y=143, x=488, pixels=30768
+Frame 5: runner center y=182, x=499, pixels=87632
+Frame 6: runner center y=179, x=532, pixels=78706
+Frame 7: runner center y=177, x=535, pixels=85168
+Frame 8: runner center
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# Let\'s look at the bottom portion of the frame where the runner\'s feet would be\n# The runner\'s vertical position (feet) should show the jump arc\n# Let\'s track the bottom of the runner (highest y value of the runner mask)\nfirst_frame = frames[0].astype(np.float64)\n\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        # Track the bottom of the runner (max y)\n        bottom_y = np.max(ys)\n        top_y = np.min(ys)\n        # Track the center of mass\n        cy = np.mean(ys)\n        # Track the bottom edge of the runner (feet position)\n        # Look at the bottom 20% of the frame\n        print(f\'Frame {i}: bottom_y={bottom_y}, top_y={top_y}, cy={cy:.0f}, pixels={len(ys)}\')\n" 2>&1 | head -30', 'timeout': 15})
+<< Frame 1: bottom_y=489, top_y=0, cy=128, pixels=19970
+Frame 2: bottom_y=520, top_y=0, cy=150, pixels=28098
+Frame 3: bottom_y=520, top_y=0, cy=141, pixels=24973
+Frame 4: bottom_y=520, top_y=0, cy=143, pixels=30768
+Frame 5: bottom_y=521, top_y=0, cy=182, pixels=87632
+Frame 6: bottom_y=521, top_y=0, cy=179, pixels=78706
+Frame 7: bottom_y=538, top_y=0, cy=177, pixels=85168
+Frame 8: bottom_y=538, top_y=
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# Let\'s look at the runner\'s vertical position more carefully\n# Focus on the lower part of the frame where the runner\'s body is\n# The runner\'s center of mass should go UP during the jump and DOWN after landing\nfirst_frame = frames[0].astype(np.float64)\n\n# Let\'s look at the bottom portion of the frame (where the runner is)\n# and track the bottom edge of the runner\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        # Focus on the bottom part of the runner - track the lowest y of the runner\n        # The runner\'s feet should be at the bottom of the mask\n        # But the mask might include the ground shadow\n        # Let\'s look at the bottom 100 rows of the frame\n        bottom_region = mask[400:, :]\n        if np.any(bottom_region):\n            bys, bxs = np.where(bottom_region)\n            actual_bottom_y = np.max(bys) + 400\n            # Also track the top of the runner in the bottom region\n            actual_top_y = np.min(bys) + 400\n            print(f\'Frame {i}: bottom_region_y={actual_bottom_y}, top_in_bottom={actual_top_y}, total_pixels={len(ys)}\')\n        else:\n            print(f\'Frame {i}: no bottom region, total_pixels={len(ys)}\')\n" 2>&1 | head -40', 'timeout': 15})
+<< Frame 1: bottom_region_y=489, top_in_bottom=400, total_pixels=19970
+Frame 2: bottom_region_y=520, top_in_bottom=400, total_pixels=28098
+Frame 3: bottom_region_y=520, top_in_bottom=400, total_pixels=24973
+Frame 4: bottom_region_y=520, top_in_bottom=400, total_pixels=30768
+Frame 5: bottom_region_y=521, top_in_bottom=400, total_pixels=87632
+Frame 6: bottom_region_y=521, top_in_bottom=400, total_pixel
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\n# Let\'s look at the runner\'s vertical center of mass more carefully\n# The runner runs horizontally, then jumps (goes up in the air), then lands\n# The key is tracking the vertical position of the runner\'s center of mass\n# During the jump, the center of mass should rise and then fall\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Let\'s track the center of mass y position for each frame\n# Focus on the region where the runner is (lower part of frame)\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        # Weighted by difference intensity\n        diff_vals = diff[mask]\n        cy = np.average(ys, weights=diff_vals)\n        cx = np.average(xs, weights=diff_vals)\n        print(f\'Frame {i}: weighted_cy={cy:.1f}, weighted_cx={cx:.1f}, pixels={len(ys)}\')\n" 2>&1 | head -50', 'timeout': 15})
+<< Traceback (most recent call last):
+  File "<string>", line 29, in <module>
+    cy = np.average(ys, weights=diff_vals)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 580, in average
+    wgt = _weights_are_valid(weights=weights, a=a, axis=axis)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 419, in _weights_are_valid
+ 
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Track center of mass y position\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        diff_vals = diff[mask]\n        cy = np.average(ys, weights=diff_vals)\n        cx = np.average(xs, weights=diff_vals)\n        print(f\'Frame {i}: weighted_cy={cy:.1f}, weighted_cx={cx:.1f}, pixels={len(ys)}\')\n" 2>&1 | head -50', 'timeout': 15})
+<< Traceback (most recent call last):
+  File "<string>", line 22, in <module>
+    cy = np.average(ys, weights=diff_vals)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 580, in average
+    wgt = _weights_are_valid(weights=weights, a=a, axis=axis)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 419, in _weights_are_valid
+ 
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Track center of mass y position\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        diff_vals = diff[mask]\n        cy = np.average(ys, weights=diff_vals.flatten())\n        cx = np.average(xs, weights=diff_vals.flatten())\n        print(f\'Frame {i}: weighted_cy={cy:.1f}, weighted_cx={cx:.1f}, pixels={len(ys)}\')\n" 2>&1 | head -50', 'timeout': 15})
+<< Traceback (most recent call last):
+  File "<string>", line 22, in <module>
+    cy = np.average(ys, weights=diff_vals.flatten())
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 580, in average
+    wgt = _weights_are_valid(weights=weights, a=a, axis=axis)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 419, in _weights_a
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Track center of mass y position\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        diff_vals = diff[mask]\n        cy = np.average(ys, weights=diff_vals, axis=0)\n        cx = np.average(xs, weights=diff_vals, axis=0)\n        print(f\'Frame {i}: weighted_cy={cy:.1f}, weighted_cx={cx:.1f}, pixels={len(ys)}\')\n" 2>&1 | head -50', 'timeout': 15})
+<< Traceback (most recent call last):
+  File "<string>", line 22, in <module>
+    cy = np.average(ys, weights=diff_vals, axis=0)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 580, in average
+    wgt = _weights_are_valid(weights=weights, a=a, axis=axis)
+  File "/usr/local/lib/python3.13/site-packages/numpy/lib/_function_base_impl.py", line 423, in _weights_are
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Track center of mass y position - use simple mean\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        cy = np.mean(ys)\n        cx = np.mean(xs)\n        print(f\'Frame {i}: cy={cy:.1f}, cx={cx:.1f}, pixels={len(ys)}\')\n" 2>&1 | head -50', 'timeout': 15})
+<< Frame 1: cy=128.0, cx=473.0, pixels=19970
+Frame 2: cy=149.8, cx=511.5, pixels=28098
+Frame 3: cy=141.0, cx=498.4, pixels=24973
+Frame 4: cy=143.4, cx=488.2, pixels=30768
+Frame 5: cy=181.6, cx=499.1, pixels=87632
+Frame 6: cy=178.7, cx=532.1, pixels=78706
+Frame 7: cy=176.5, cx=535.4, pixels=85168
+Frame 8: cy=176.6, cx=539.4, pixels=86773
+Frame 9: cy=176.6, cx=539.5, pixels=86373
+Frame 10: cy=176.5, cx
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Let\'s look at the bottom edge of the runner (feet position)\n# The runner\'s feet should be at the bottom of the mask\n# During the jump, the feet go up (in the air) and then come down\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        # The bottom of the runner (feet) - look at the bottom portion\n        # Focus on the bottom 100 rows\n        bottom_mask = mask[440:, :]\n        if np.any(bottom_mask):\n            bys, bxs = np.where(bottom_mask)\n            # The bottom-most y of the runner\n            bottom_y = np.max(bys) + 440\n            # The top of the bottom region where the runner is\n            top_of_bottom = np.min(bys) + 440\n            # The height of the runner in the bottom region\n            height = bottom_y - top_of_bottom\n            print(f\'Frame {i}: bottom_y={bottom_y}, top_of_bottom={top_of_bottom}, height={height}, pixels={len(ys)}\')\n        else:\n            print(f\'Frame {i}: no bottom region, pixels={len(ys)}\')\n" 2>&1 | head -50', 'timeout': 15})
+<< Frame 1: bottom_y=489, top_of_bottom=466, height=23, pixels=19970
+Frame 2: bottom_y=520, top_of_bottom=464, height=56, pixels=28098
+Frame 3: bottom_y=520, top_of_bottom=464, height=56, pixels=24973
+Frame 4: bottom_y=520, top_of_bottom=464, height=56, pixels=30768
+Frame 5: bottom_y=521, top_of_bottom=463, height=58, pixels=87632
+Frame 6: bottom_y=521, top_of_bottom=462, height=59, pixels=78706
+Fram
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# Let\'s look at the top of the runner (head position)\n# During the jump, the head goes up then down\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        top_y = np.min(ys)\n        bottom_y = np.max(ys)\n        height = bottom_y - top_y\n        print(f\'Frame {i}: top_y={top_y}, bottom_y={bottom_y}, height={height}, pixels={len(ys)}\')\n" 2>&1', 'timeout': 15})
+<< Frame 1: top_y=0, bottom_y=489, height=489, pixels=19970
+Frame 2: top_y=0, bottom_y=520, height=520, pixels=28098
+Frame 3: top_y=0, bottom_y=520, height=520, pixels=24973
+Frame 4: top_y=0, bottom_y=520, height=520, pixels=30768
+Frame 5: top_y=0, bottom_y=521, height=521, pixels=87632
+Frame 6: top_y=0, bottom_y=521, height=521, pixels=78706
+Frame 7: top_y=0, bottom_y=538, height=538, pixels=85168
+F
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# The mask is too large - it includes the ground. Let\'s look at the runner\'s body\n# more carefully. Let\'s look at the top portion of the mask (the runner\'s head/body)\n# and track the top edge of the runner\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        # Look at the top 200 rows of the frame\n        top_mask = mask[:200, :]\n        if np.any(top_mask):\n            tys, txs = np.where(top_mask)\n            top_y = np.min(tys)\n            bottom_of_top = np.max(tys)\n            print(f\'Frame {i}: top_y={top_y}, bottom_of_top={bottom_of_top}, top_pixels={len(tys)}\')\n        else:\n            print(f\'Frame {i}: no top region\')\n" 2>&1', 'timeout': 15})
+<< Frame 1: top_y=0, bottom_of_top=199, top_pixels=17417
+Frame 2: top_y=0, bottom_of_top=199, top_pixels=21448
+Frame 3: top_y=0, bottom_of_top=199, top_pixels=20257
+Frame 4: top_y=0, bottom_of_top=199, top_pixels=24640
+Frame 5: top_y=0, bottom_of_top=199, top_pixels=56406
+Frame 6: top_y=0, bottom_of_top=199, top_pixels=51261
+Frame 7: top_y=0, bottom_of_top=199, top_pixels=56020
+Frame 8: top_y=0, bott
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport cv2\nimport numpy as np\n\ncap = cv2.VideoCapture(\'example_video.mp4\')\nframes = []\nfor i in range(120):\n    ret, frame = cap.read()\n    if ret:\n        frames.append(frame)\ncap.release()\n\nfirst_frame = frames[0].astype(np.float64)\n\n# The mask is too large because it includes the ground.\n# Let\'s look at the runner\'s body more carefully by focusing on a specific region\n# where the runner is likely to be (not the ground)\n# Let\'s look at the middle portion of the frame (where the runner\'s body is)\n# and track the top edge of the runner\'s body\n\nfor i in range(len(frames)):\n    diff = np.abs(frames[i].astype(np.float64) - first_frame)\n    mask = (diff > 10).any(axis=2)\n    ys, xs = np.where(mask)\n    if len(ys) > 0:\n        # Focus on the middle portion (100-400) where the runner\'s body is\n        mid_mask = mask[100:400, :]\n        if np.any(mid_mask):\n            mys, mxs = np.where(mid_mask)\n            top_of_mid = np.min(mys) + 100\n            bottom_of_mid = np.max(mys) + 100\n            print(f\'Frame {i}: top_of_mid={top_of_mid}, bottom_of_mid={bottom_of_mid}, mid_pixels={len(mys)}\')\n        else:\n            print(f\'Frame {i}: no mid region\')\n" 2>&1', 'timeout': 15})
+<< Frame 1: top_of_mid=100, bottom_of_mid=399, mid_pixels=12187
+Frame 2: top_of_mid=100, bottom_of_mid=399, mid_pixels=18930
+Frame 3: top_of_mid=100, bottom_of_mid=399, mid_pixels=15978
+Frame 4: top_of_mid=100, bottom_of_mid=399, mid_pixels=20778
+Frame 5: top_of_mid=100, bottom_of_mid=399, mid_pixels=56820
+Frame 6: top_of_mid=100, bottom_of_mid=399, mid_pixels=52254
+Frame 7: top_of_mid=100, bottom_of
+
+=== pi notifications (3) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Backtracking]
+[warning] quality-monitor: empty_response → injecting correction

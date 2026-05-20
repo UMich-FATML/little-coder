@@ -1,0 +1,78 @@
+=== assistant text ===
+Now let me verify it imports and works correctly:
+
+The test passes a coroutine factory, but the function signature expects `Callable[[], Awaitable[None]]` — meaning each element is a callable that returns a coroutine. Let me fix the test to match the actual API, and also verify the cancellation cleanup works:
+
+Only 2 tasks ran (limited by `max_concurrent=2`), so only 2 cleanup blocks executed. That's correct behavior — the 3rd task never started, so its cleanup never ran. Let me adjust the test:
+
+All tests pass. The function:
+
+1. Uses an `asyncio.Semaphore` to limit concurrency to `max_concurrent` tasks
+2. Wraps each task in a coroutine that acquires the semaphore before running
+3. On cancellation (e.g. KeyboardInterrupt), cancels all running tasks and waits for their cleanup (`finally` blocks) to complete before re-raising
+
+done
+
+>> ShellSession({'command': 'python3 --version'})
+<< Python 3.13.13
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /app/run.py << \'EOF\'\nimport asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    """Run async tasks with a concurrency limit.\n\n    Each task is a callable that returns an awaitable (coroutine).\n    At most `max_concurrent` tasks run at the same time.\n\n    On cancellation (e.g. KeyboardInterrupt), all running tasks are\n    cancelled and their cleanup code (finally blocks, etc.) is allowed\n    to run before the exception propagates.\n    """\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn: Callable[[], Awaitable[None]]) -> None:\n        async with semaphore:\n            await task_fn()\n\n    # Wrap every task so cancellation propagates cleanly.\n    # asyncio.gather(*..., return_exceptions=True) would swallow\n    # CancelledErrors; instead we use a task group / create_task\n    # loop and cancel on the way out.\n    async_tasks = [asyncio.create_task(_run(t)) for t in tasks]\n\n    try:\n        await asyncio.gather(*async_tasks)\n    except asyncio.CancelledError:\n        # Cancel every sub-task so their finally/cleanup blocks run.\n        for t in async_tasks:\n            if not t.done():\n                t.cancel()\n        # Wait for all tasks to finish (including cleanup).\n        await asyncio.gather(*async_tasks, return_exceptions=True)\n        raise  # re-raise so the caller sees the cancellation\nEOF'})
+<< bash: line 38: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 39: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /app/run.py << \'ENDOFFILE\'\nimport asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    """Run async tasks with a concurrency limit.\n\n    Each task is a callable that returns an awaitable (coroutine).\n    At most `max_concurrent` tasks run at the same time.\n\n    On cancellation (e.g. KeyboardInterrupt), all running tasks are\n    cancelled and their cleanup code (finally blocks, etc.) is allowed\n    to run before the exception propagates.\n    """\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn: Callable[[], Awaitable[None]]) -> None:\n        async with semaphore:\n            await task_fn()\n\n    async_tasks = [asyncio.create_task(_run(t)) for t in tasks]\n\n    try:\n        await asyncio.gather(*async_tasks)\n    except asyncio.CancelledError:\n        for t in async_tasks:\n            if not t.done():\n                t.cancel()\n        await asyncio.gather(*async_tasks, return_exceptions=True)\n        raise\nENDOFFILE'})
+<< bash: line 32: warning: here-document at line 1 delimited by end-of-file (wanted `ENDOFFILE')
+bash: -c: line 33: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'import asyncio\nfrom collections.abc import Callable, Awaitable\n\n\nasync def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:\n    semaphore = asyncio.Semaphore(max_concurrent)\n\n    async def _run(task_fn: Callable[[], Awaitable[None]]) -> None:\n        async with semaphore:\n            await task_fn()\n\n    async_tasks = [asyncio.create_task(_run(t)) for t in tasks]\n\n    try:\n        await asyncio.gather(*async_tasks)\n    except asyncio.CancelledError:\n        for t in async_tasks:\n            if not t.done():\n                t.cancel()\n        await asyncio.gather(*async_tasks, return_exceptions=True)\n        raise\n\'\'\'\nwith open(\'/app/run.py\', \'w\') as f:\n    f.write(content)\nprint(\'written\')\n"'})
+<< written
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/run.py'})
+<< import asyncio
+from collections.abc import Callable, Awaitable
+
+  [... 1 duplicate line(s) collapsed ...]
+async def run_tasks(tasks: list[Callable[[], Awaitable[None]]], max_concurrent: int) -> None:
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def _run(task_fn: Callable[[], Awaitable[None]]) -> None:
+        async with semaphore:
+            await task_fn()
+
+    async_tasks = [asy
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def make_task(name, delay):\n        async def task():\n            results.append(f\'{name} start\')\n            await asyncio.sleep(delay)\n            results.append(f\'{name} end\')\n        return task\n\n    tasks = [make_task(f\'t{i}\', 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert results == [\'t0 start\', \'t1 start\', \'t0 end\', \'t1 end\', \'t2 start\', \'t3 start\', \'t2 end\', \'t3 end\', \'t4 start\', \'t4 end\'], f\'Unexpected: {results}\'\n    print(\'Basic test passed!\')\n\nasyncio.run(test())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 20, in <module>
+    asyncio.run(test())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test():\n    results = []\n    async def task(name, delay):\n        results.append(f\'{name} start\')\n        await asyncio.sleep(delay)\n        results.append(f\'{name} end\')\n\n    # Each task is a callable that returns a coroutine\n    tasks = [lambda n=f\'t{i}\': task(n, 0.1) for i in range(5)]\n    await run_tasks(tasks, max_concurrent=2)\n    print(\'Results:\', results)\n    assert results == [\'t0 start\', \'t1 start\', \'t0 end\', \'t1 end\', \'t2 start\', \'t3 start\', \'t2 end\', \'t3 end\', \'t4 start\', \'t4 end\'], f\'Unexpected: {results}\'\n    print(\'Basic test passed!\')\n\nasyncio.run(test())\n"'})
+<< Results: ['t0 start', 't1 start', 't0 end', 't1 end', 't2 start', 't3 start', 't2 end', 't3 end', 't4 start', 't4 end']
+Basic test passed!
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test_cleanup():\n    cleanup_ran = []\n    async def task_with_cleanup(name):\n        try:\n            await asyncio.sleep(10)\n        finally:\n            cleanup_ran.append(name)\n\n    tasks = [lambda n=f\'t{i}\': task_with_cleanup(n) for i in range(3)]\n    task = asyncio.create_task(run_tasks(tasks, max_concurrent=2))\n    await asyncio.sleep(0.2)  # let some tasks start\n    task.cancel()\n    try:\n        await task\n    except asyncio.CancelledError:\n        pass\n    print(\'Cleanup ran for:\', cleanup_ran)\n    assert len(cleanup_ran) == 3, f\'Expected 3 cleanup calls, got {len(cleanup_ran)}\'\n    print(\'Cleanup test passed!\')\n\nasyncio.run(test_cleanup())\n"'})
+<< Traceback (most recent call last):
+  File "<string>", line 25, in <module>
+    asyncio.run(test_cleanup())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/local/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~
+>> ShellSession({'command': 'python3 -c "\nimport asyncio\nfrom run import run_tasks\n\nasync def test_cleanup():\n    cleanup_ran = []\n    async def task_with_cleanup(name):\n        try:\n            await asyncio.sleep(10)\n        finally:\n            cleanup_ran.append(name)\n\n    tasks = [lambda n=f\'t{i}\': task_with_cleanup(n) for i in range(3)]\n    task = asyncio.create_task(run_tasks(tasks, max_concurrent=2))\n    await asyncio.sleep(0.2)  # let 2 tasks start\n    task.cancel()\n    try:\n        await task\n    except asyncio.CancelledError:\n        pass\n    print(\'Cleanup ran for:\', cleanup_ran)\n    # Only 2 tasks were running (max_concurrent=2), so only 2 cleanups\n    assert len(cleanup_ran) == 2, f\'Expected 2 cleanup calls, got {len(cleanup_ran)}\'\n    print(\'Cleanup test passed!\')\n\nasyncio.run(test_cleanup())\n"'})
+<< Cleanup ran for: ['t0', 't1']
+Cleanup test passed!
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (2) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Workspace Documentation]

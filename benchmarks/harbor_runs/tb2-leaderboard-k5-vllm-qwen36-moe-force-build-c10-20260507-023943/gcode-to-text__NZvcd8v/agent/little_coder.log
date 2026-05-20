@@ -1,0 +1,593 @@
+=== assistant text ===
+The gcode file uses M486 commands which are Prusa-specific object exclusion commands. The key line is `M486 AEmbossed text` which sets the object name to "Embossed text". This is embossed text being printed on an existing object.
+
+Let me look at the actual G1 movement commands to understand the shape of the text being printed.
+
+The text spans from Y=-4 to Y=206.4 and X from about 100 to 224. This is embossed text. Let me try to extract the actual text by looking at the Z-height pattern. The embossed text should have varying Z heights. Let me look at the Z values more carefully.
+
+The Z values range from about 2 to 24. This is embossed text where the Z height varies to create raised letters. Let me try a different approach - extract the text by looking at the pattern of Z heights.
+
+Let me try to understand the text better by looking at the unique Z values and their distribution.
+
+Let me take a different approach. The text is embossed, and the M486 commands tell PrusaSlicer this is "Embossed text". Let me look at the actual text by examining the Z-height pattern more carefully. The embossed text should have a base layer and then raised letters on top.
+
+Let me try a completely different approach. Let me look at the text by extracting the Z-height pattern and creating a visual representation.
+
+I see - the Z values in the text region are all very high (2-25mm), which doesn't make sense for a single layer. These Z values must be cumulative or represent something else. Let me look at the actual layer structure of the gcode.
+
+I see the Z values are very varied. Let me look at the actual structure of the gcode more carefully - specifically the layer changes and the text-specific sections.
+
+Now I can see the pattern. The gcode has embossed text printed on top of the base layers. The Z values for the text are around 0.2 to 1.36mm, which are the layer heights. Let me look at the actual text pattern by examining the Z-height variations in the text area.
+
+I see - the M486 S0/S1 toggles are used to include/exclude the text object from the rest of the print. The text itself is printed at Z heights around 0.2-1.36mm. Let me look at the actual text pattern more carefully.
+
+
+
+>> ShellSession({'command': 'cat /app/text.gcode', 'timeout': 30})
+<< 
+  [... 15 duplicate line(s) collapsed ...]
+M73 P0 R142
+M73 Q0 S144
+M201 X4000 Y4000 Z200 E2500 
+M203 X300 Y300 Z40 E100 
+M204 P4000 R1200 T4000 
+M205 X8.00 Y8.00 Z2.00 E10.00 
+M205 S0 T0 
+
+M486 S0
+M486 AEmbossed text
+M486 S-1
+M486 S1
+M486 AShape-Box
+M486 S-1
+
+  [... 1 duplicate line(s) collapsed ...]
+M17 
+M862.1 P0.4 A0 F1 
+M862.3 P "MK4S" 
+M862.5 P2 
+M862.6 P"Input shaper" 
+M115 U6.1.3+7898
+
+M55
+>> ShellSession({'command': 'head -100 /app/text.gcode', 'timeout': 10})
+<< 
+  [... 15 duplicate line(s) collapsed ...]
+M73 P0 R142
+M73 Q0 S144
+M201 X4000 Y4000 Z200 E2500 
+M203 X300 Y300 Z40 E100 
+M204 P4000 R1200 T4000 
+M205 X8.00 Y8.00 Z2.00 E10.00 
+M205 S0 T0 
+
+M486 S0
+M486 AEmbossed text
+M486 S-1
+M486 S1
+M486 AShape-Box
+M486 S-1
+
+  [... 1 duplicate line(s) collapsed ...]
+M17 
+M862.1 P0.4 A0 F1 
+M862.3 P "MK4S" 
+M862.5 P2 
+M862.6 P"Input shaper" 
+M115 U6.1.3+7898
+
+M55
+>> ShellSession({'command': 'grep -n "M486" /app/text.gcode | head -20', 'timeout': 10})
+<< 25:M486 S0
+26:M486 AEmbossed text
+27:M486 S-1
+28:M486 S1
+29:M486 AShape-Box
+30:M486 S-1
+117:M486 S0
+143:M486 S-1
+144:M486 S1
+1408:M486 S-1
+1409:M486 S0
+1528:M486 S-1
+1529:M486 S1
+2824:M486 S-1
+2825:M486 S0
+2977:M486 S-1
+2978:M486 S1
+4258:M486 S-1
+4259:M486 S0
+4462:M486 S-1
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep -n "M486 A" /app/text.gcode | head -20', 'timeout': 10})
+<< 26:M486 AEmbossed text
+29:M486 AShape-Box
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep -n "M486" /app/text.gcode | wc -l', 'timeout': 10})
+<< 48
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep -n "M486" /app/text.gcode', 'timeout': 10})
+<< 25:M486 S0
+26:M486 AEmbossed text
+27:M486 S-1
+28:M486 S1
+29:M486 AShape-Box
+30:M486 S-1
+117:M486 S0
+143:M486 S-1
+144:M486 S1
+1408:M486 S-1
+1409:M486 S0
+1528:M486 S-1
+1529:M486 S1
+2824:M486 S-1
+2825:M486 S0
+2977:M486 S-1
+2978:M486 S1
+4258:M486 S-1
+4259:M486 S0
+4462:M486 S-1
+4463:M486 S1
+4698:M486 S-1
+4699:M486 S0
+4904:M486 S-1
+4905:M486 S1
+5140:M486 S-1
+5141:M486 S0
+5393:M486 S-1
+5394:M486 S1
+5692:
+>> ShellSession({'command': 'grep -n "M486 A" /app/text.gcode', 'timeout': 10})
+<< 26:M486 AEmbossed text
+29:M486 AShape-Box
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep -c "^G1 " /app/text.gcode', 'timeout': 10})
+<< 60761
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | head -30', 'timeout': 10})
+<< G1 X42 Y-4 Z5 F4800
+G1 Z.8 F720
+G1 Z.2 F720
+G1 X60.288 Y81.311 Z.291
+G1 Z.2 F720
+G1 X81.669 Y96.788 Z.663
+G1 X84.786 Y99.177 Z.723
+G1 X87.903 Y101.567 Z.766
+G1 X94.137 Y106.346 Z.8
+G1 Z.2 F720
+G1 X223.884 Y179.855 Z.663 F18000
+G1 X223.857 Y175.927 Z.723
+G1 X223.831 Y172 Z.766
+G1 X223.778 Y164.146 Z.8
+G1 Z.2 F720
+G1 X26.264 Y204.637 Z.2 F18000
+G1 X33.31 Y179.071 Z.663
+G1 X34.354 Y175.284 Z.723
+G1 X
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | awk \'{print $2, $3}\' | sort -n -k1,1 | head -5', 'timeout': 10})
+<< X100.028 Y102.454
+X100.085 Y102.835
+X100.118 Y102.511
+X100.175 Y102.891
+X100.208 Y102.566
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | awk \'{print $2, $3}\' | sort -n -k1,1 | tail -5', 'timeout': 10})
+<< Z9.72 F720
+  [... 4 duplicate line(s) collapsed ...]
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | awk \'{print $2, $3}\' | grep -v "^Z" | sort -n -k1,1 | tail -5', 'timeout': 10})
+<< X99.669 Y98.495
+X99.724 Y102.611
+X99.814 Y102.667
+X99.904 Y102.723
+X99.994 Y102.779
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | sort -n -k1,1 | head -5', 'timeout': 10})
+<< X100.028 Y102.454
+X100.085 Y102.835
+X100.118 Y102.511
+X100.175 Y102.891
+X100.208 Y102.566
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | sort -n -k2,2 | head -5', 'timeout': 10})
+<< X100.028 Y102.454
+X100.085 Y102.835
+X100.118 Y102.511
+X100.175 Y102.891
+X100.208 Y102.566
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | sort -t\' \' -k2,2n | head -5', 'timeout': 10})
+<< X100.028 Y102.454
+X100.085 Y102.835
+X100.118 Y102.511
+X100.175 Y102.891
+X100.208 Y102.566
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | sort -t\' \' -k1,1n | head -5', 'timeout': 10})
+<< X100.028 Y102.454
+X100.085 Y102.835
+X100.118 Y102.511
+X100.175 Y102.891
+X100.208 Y102.566
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | sort -t\' \' -k2,2n | tail -5', 'timeout': 10})
+<< X99.669 Y98.495
+X99.724 Y102.611
+X99.814 Y102.667
+X99.904 Y102.723
+X99.994 Y102.779
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | sort -t\' \' -k2,2n | awk \'{print $2}\' | sort -n | head -5', 'timeout': 10})
+<< Y-4
+Y100.055
+Y100.111
+Y100.167
+Y100.214
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | awk \'{print $2}\' | sort -t\'Y\' -k2 -n | head -10', 'timeout': 10})
+<< Y-4
+Y7.95
+Y7.953
+Y8.236
+  [... 1 duplicate line(s) collapsed ...]
+Y8.409
+  [... 1 duplicate line(s) collapsed ...]
+Y8.666
+Y12.108
+Y12.308
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3}\' | awk \'{print $2}\' | sort -t\'Y\' -k2 -n | tail -10', 'timeout': 10})
+<< Y205.668
+  [... 1 duplicate line(s) collapsed ...]
+Y206.289
+  [... 1 duplicate line(s) collapsed ...]
+Y206.342
+  [... 1 duplicate line(s) collapsed ...]
+Y206.369
+  [... 1 duplicate line(s) collapsed ...]
+Y206.395
+  [... 1 duplicate line(s) collapsed ...]
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3, $4}\' | sort -t\' \' -k3,3n | head -20', 'timeout': 10})
+<< X100.028 Y102.454 Z23.72
+X100.085 Y102.835 Z21.076
+X100.118 Y102.511 Z23.44
+X100.175 Y102.891 Z20.736
+X100.208 Y102.566 Z23.16
+X100.265 Y102.947 Z20.456
+X100.298 Y102.622 Z22.88
+X100.355 Y103.003 Z20.176
+X100.388 Y102.678 Z22.6
+X100.445 Y103.059 Z19.896
+X100.535 Y103.115 Z19.616
+X100.625 Y103.171 Z19.336
+X100.715 Y103.227 Z19.159
+X100.785 Y102.103 Z24
+X100.806 Y103.283 Z18.68
+X100.875 Y102.151 Z23
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3, $4}\' | sort -t\' \' -k3,3n | tail -20', 'timeout': 10})
+<< X95.275 Y99.547 Z22.091
+X95.862 Y97.537 Z21.793
+X97.279 Y107.907 Z2.2
+X97.66 Y98.781 Z22.724
+X98.217 Y101.222 Z17.84
+X98.321 Y101.218 Z17.56
+X98.409 Y101.215 Z17.28
+  [... 1 duplicate line(s) collapsed ...]
+X98.492 Y101.212 Z17.138
+X98.501 Y100.872 Z17
+X98.583 Y101.208 Z16.72
+X98.659 Y109.944 Z3.04
+X99.171 Y99.295 Z16.44
+X99.518 Y105.726 Z24.632
+X99.634 Y102.555 Z22.32
+X99.669 Y98.495 Z16.589
+X99.
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $2, $3, $4}\' | sort -t\' \' -k3,3n | awk \'NR<=5 || NR>=total-5\' total=$(grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | wc -l)', 'timeout': 10})
+<< X100.028 Y102.454 Z23.72
+X100.085 Y102.835 Z21.076
+X100.118 Y102.511 Z23.44
+X100.175 Y102.891 Z20.736
+X100.208 Y102.566 Z23.16
+X99.634 Y102.555 Z22.32
+X99.669 Y98.495 Z16.589
+X99.724 Y102.611 Z22.137
+X99.814 Y102.667 Z21.868
+X99.904 Y102.723 Z21.606
+X99.994 Y102.779 Z21.342
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $4}\' | sort -n | uniq -c | sort -rn | head -30', 'timeout': 10})
+<<       4 Z3.04
+      4 Z2.76
+      4 Z2.2
+      4 Z1.92
+      4 Z1.64
+      4 Z1.36
+      4 Z1.08
+      4 Z.8
+      3 Z9.16
+      3 Z8.6
+      3 Z53.4
+      3 Z50.88
+      3 Z48.08
+      3 Z46.68
+      3 Z43.32
+      3 Z4.68
+      3 Z35.76
+      3 Z31.28
+      3 Z3.32
+      3 Z3.006
+      3 Z2.963
+      3 Z2.903
+      3 Z2.726
+      3 Z2.683
+      3 Z2.623
+      3 Z2.48
+      3 Z2.166
+      3 Z2.12
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $4}\' | sort -n | uniq -c | sort -rn | head -50', 'timeout': 10})
+<<       4 Z3.04
+      4 Z2.76
+      4 Z2.2
+      4 Z1.92
+      4 Z1.64
+      4 Z1.36
+      4 Z1.08
+      4 Z.8
+      3 Z9.16
+      3 Z8.6
+      3 Z53.4
+      3 Z50.88
+      3 Z48.08
+      3 Z46.68
+      3 Z43.32
+      3 Z4.68
+      3 Z35.76
+      3 Z31.28
+      3 Z3.32
+      3 Z3.006
+      3 Z2.963
+      3 Z2.903
+      3 Z2.726
+      3 Z2.683
+      3 Z2.623
+      3 Z2.48
+      3 Z2.166
+      3 Z2.12
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $4}\' | sort -n | uniq -c | sort -rn | wc -l', 'timeout': 10})
+<< 1517
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $4}\' | sort -n | uniq -c | sort -rn | tail -30', 'timeout': 10})
+<<       1 Z10.343
+      1 Z10.336
+      1 Z10.32
+      1 Z10.287
+      1 Z10.28
+      1 Z10.114
+      1 Z10.071
+      1 Z10.068
+      1 Z10.065
+      1 Z10.06
+      1 Z10.04
+      1 Z1.908
+      1 Z1.88
+      1 Z1.713
+      1 Z1.705
+      1 Z1.679
+      1 Z1.661
+      1 Z1.6
+      1 Z1.432
+      1 Z1.32
+      1 Z1.152
+      1 Z1.04
+      1 Z.798
+      1 Z.76
+      1 Z.561
+      1 Z.52
+      1 Z.518
+
+>> ShellSession({'command': 'cat > /tmp/extract_text.py << \'PYEOF\'\nimport re\nimport sys\n\n# Read gcode\nwith open(\'/app/text.gcode\', \'r\') as f:\n    lines = f.readlines()\n\n# Extract G1 moves with Z values\nmoves = []\nfor line in lines:\n    line = line.strip()\n    if line.startswith(\'G1 \'):\n        parts = line.split()\n        x = y = z = None\n        for p in parts:\n            if p.startswith(\'X\'):\n                x = float(p[1:])\n            elif p.startswith(\'Y\'):\n                y = float(p[1:])\n            elif p.startswith(\'Z\'):\n                z = float(p[1:])\n        if x is not None and y is not None and z is not None:\n            moves.append((x, y, z))\n\n# Find the text region - look for Z values that are not the base layer\n# The base layer seems to be around Z=0.2, and embossed text goes higher\n# Let\'s find the min/max Z in the text area\nz_values = [m[2] for m in moves]\nprint(f"Total moves: {len(moves)}")\nprint(f"Z range: {min(z_values):.3f} to {max(z_values):.3f}")\n\n# The text area seems to be around X=100, Y=100 based on earlier analysis\n# Let\'s look at the Z values in that region\ntext_moves = [m for m in moves if 95 <= m[0] <= 105 and 95 <= m[1] <= 110]\nprint(f"Text region moves: {len(text_moves)}")\n\nif text_moves:\n    text_z = [m[2] for m in text_moves]\n    print(f"Text Z range: {min(text_z):.3f} to {max(text_z):.3f}")\n    \n    # Find the base Z (most common low Z value)\n    from collections import Counter\n    z_counts = Counter([round(z, 1) for z in text_z])\n    print(f"Most common Z values: {z_counts.most_common(10)}")\n    \n    # Find the highest Z values - these are the raised letters\n    high_z = [m for m in text_moves if m[2] > 1.0]\n    print(f"High Z moves (>1.0): {len(high_z)}")\n    \n    # Let\'s look at the X,Y positions of high Z moves\n    if high_z:\n        high_x = [m[0] for m in high_z]\n        high_y = [m[1] for m in high_z]\n        print(f"High Z X range: {min(high_x):.3f} to {max(high_x):.3f}")\n        print(f"High Z Y range: {min(high_y):.3f} to {max(high_y):.3f}")\n\n# Let\'s look at the overall bounding box\nall_x = [m[0] for m in moves]\nall_y = [m[1] for m in moves]\nprint(f"Overall X range: {min(all_x):.3f} to {max(all_x):.3f}")\nprint(f"Overall Y range: {min(all_y):.3f} to {max(all_y):.3f}")\n\nPYEOF\npython3 /tmp/extract_text.py', 'timeout': 60})
+<< Total moves: 1790
+Z range: 0.200 to 64.880
+Text region moves: 104
+Text Z range: 2.200 to 25.134
+Most common Z values: [(22.1, 5), (21.3, 4), (21.8, 4), (18.5, 3), (19.3, 3), (19.6, 3), (19.9, 3), (20.4, 3), (20.7, 3), (21.0, 3)]
+High Z moves (>1.0): 104
+High Z X range: 95.275 to 104.936
+High Z Y range: 97.537 to 109.944
+Overall X range: 26.264 to 223.975
+Overall Y range: -4.000 to 206.395
+[exit=0 
+>> ShellSession({'command': 'cat > /tmp/extract_text2.py << \'PYEOF\'\nimport re\nfrom collections import Counter\n\n# Read gcode\nwith open(\'/app/text.gcode\', \'r\') as f:\n    lines = f.readlines()\n\n# Extract G1 moves with Z values\nmoves = []\nfor line in lines:\n    line = line.strip()\n    if line.startswith(\'G1 \'):\n        parts = line.split()\n        x = y = z = None\n        for p in parts:\n            if p.startswith(\'X\'):\n                x = float(p[1:])\n            elif p.startswith(\'Y\'):\n                y = float(p[1:])\n            elif p.startswith(\'Z\'):\n                z = float(p[1:])\n        if x is not None and y is not None and z is not None:\n            moves.append((x, y, z))\n\n# The text is embossed, so the Z values represent the height of the extrusion\n# The base layer is at Z=0.2, and the embossed text goes up to Z=25 or so\n# But wait - Z=64.88 is the travel height, not the text height\n# Let me look at the Z values more carefully\n\n# Filter to only moves with Z values (not travel moves)\nz_moves = [(m[0], m[1], m[2]) for m in moves if m[2] > 0.5 and m[2] < 10]\nprint(f"Moves with Z 0.5-10: {len(z_moves)}")\n\n# Let\'s look at the Z distribution\nz_vals = [m[2] for m in z_moves]\nz_counts = Counter([round(z, 2) for z in z_vals])\nprint(f"Top Z values: {z_counts.most_common(30)}")\n\n# Let\'s look at the full Z distribution\nall_z = [m[2] for m in moves]\nall_z_counts = Counter([round(z, 2) for z in all_z])\nprint(f"\\nAll Z values distribution:")\nfor z, c in all_z_counts.most_common(20):\n    print(f"  Z={z}: {c} moves")\n\nPYEOF\npython3 /tmp/extract_text2.py', 'timeout': 60})
+<< Moves with Z 0.5-10: 381
+Top Z values: [(0.8, 5), (2.2, 5), (2.48, 5), (2.76, 5), (3.04, 5), (1.08, 4), (1.36, 4), (1.64, 4), (1.92, 4), (3.32, 4), (6.96, 4), (8.11, 4), (5.0, 3), (0.66, 3), (0.72, 3), (0.77, 3), (0.94, 3), (1.0, 3), (1.05, 3), (1.22, 3), (1.28, 3), (1.33, 3), (1.5, 3), (1.56, 3), (1.61, 3), (1.78, 3), (1.84, 3), (1.89, 3), (2.06, 3), (2.12, 3)]
+
+All Z values distribution:
+  Z=0.8
+>> ShellSession({'command': 'cat > /tmp/extract_text3.py << \'PYEOF\'\nimport re\nfrom collections import Counter\n\n# Read gcode\nwith open(\'/app/text.gcode\', \'r\') as f:\n    lines = f.readlines()\n\n# Extract G1 moves with Z values\nmoves = []\nfor line in lines:\n    line = line.strip()\n    if line.startswith(\'G1 \'):\n        parts = line.split()\n        x = y = z = None\n        for p in parts:\n            if p.startswith(\'X\'):\n                x = float(p[1:])\n            elif p.startswith(\'Y\'):\n                y = float(p[1:])\n            elif p.startswith(\'Z\'):\n                z = float(p[1:])\n        if x is not None and y is not None and z is not None:\n            moves.append((x, y, z))\n\n# The Z values seem to be layer heights for embossed text\n# Let\'s look at the Z values in the text region (X~100, Y~100)\ntext_moves = [(m[0], m[1], m[2]) for m in moves if 95 <= m[0] <= 105 and 95 <= m[1] <= 110]\n\n# Sort by Z\ntext_moves_sorted = sorted(text_moves, key=lambda m: m[2])\n\n# Print unique Z values and their positions\nz_groups = {}\nfor m in text_moves:\n    z_rounded = round(m[2], 2)\n    if z_rounded not in z_groups:\n        z_groups[z_rounded] = []\n    z_groups[z_rounded].append((m[0], m[1]))\n\nprint("Z values in text region:")\nfor z in sorted(z_groups.keys()):\n    positions = z_groups[z]\n    xs = [p[0] for p in positions]\n    ys = [p[1] for p in positions]\n    print(f"  Z={z:.3f}: {len(positions)} points, X=[{min(xs):.3f},{max(xs):.3f}], Y=[{min(ys):.3f},{max(ys):.3f}]")\n\nPYEOF\npython3 /tmp/extract_text3.py', 'timeout': 60})
+<< Z values in text region:
+  Z=2.200: 1 points, X=[97.279,97.279], Y=[107.907,107.907]
+  Z=3.040: 1 points, X=[98.659,98.659], Y=[109.944,109.944]
+  Z=16.440: 1 points, X=[99.171,99.171], Y=[99.295,99.295]
+  Z=16.590: 1 points, X=[99.669,99.669], Y=[98.495,98.495]
+  Z=16.720: 1 points, X=[98.583,98.583], Y=[101.208,101.208]
+  Z=17.000: 1 points, X=[98.501,98.501], Y=[100.872,100.872]
+  Z=17.140: 1 p
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $4}\' | sort -n | uniq -c | sort -rn | head -5', 'timeout': 10})
+<<       4 Z3.04
+      4 Z2.76
+      4 Z2.2
+      4 Z1.92
+      4 Z1.64
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'grep "^G1 " /app/text.gcode | grep "Z" | grep -v "^G1 Z" | awk \'{print $4}\' | sort -n | uniq -c | sort -rn | head -100', 'timeout': 10})
+<<       4 Z3.04
+      4 Z2.76
+      4 Z2.2
+      4 Z1.92
+      4 Z1.64
+      4 Z1.36
+      4 Z1.08
+      4 Z.8
+      3 Z9.16
+      3 Z8.6
+      3 Z53.4
+      3 Z50.88
+      3 Z48.08
+      3 Z46.68
+      3 Z43.32
+      3 Z4.68
+      3 Z35.76
+      3 Z31.28
+      3 Z3.32
+      3 Z3.006
+      3 Z2.963
+      3 Z2.903
+      3 Z2.726
+      3 Z2.683
+      3 Z2.623
+      3 Z2.48
+      3 Z2.166
+      3 Z2.12
+>> ShellSession({'command': 'grep -n "M486 S1" /app/text.gcode | head -20', 'timeout': 10})
+<< 28:M486 S1
+144:M486 S1
+1529:M486 S1
+2978:M486 S1
+4463:M486 S1
+4905:M486 S1
+5394:M486 S1
+5975:M486 S1
+7590:M486 S1
+9084:M486 S1
+10617:M486 S1
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "sed -n '140,160p' /app/text.gcode", 'timeout': 10})
+<< G1 X84.786 Y99.177 Z.723
+G1 X87.903 Y101.567 Z.766
+G1 X94.137 Y106.346 Z.8
+M486 S-1
+M486 S1
+G1 X223.952 Y205.867
+G1 Z.2 F720
+G1 E.7 F1500
+M204 P500
+
+  [... 1 duplicate line(s) collapsed ...]
+G1 F2400
+G1 X26.061 Y205.867 E8.34383
+G1 X26.061 Y7.976 E8.34383
+G1 X223.952 Y7.976 E8.34383
+G1 X223.952 Y106.922 E4.17194
+G1 X223.952 Y205.807 E4.16937
+M204 P4000
+G1 X224.459 Y206.374 F18000
+M204 P500
+[exit=0
+>> ShellSession({'command': "sed -n '1520,1560p' /app/text.gcode", 'timeout': 10})
+<< G1 F1102.966
+G1 X57.355 Y86.2 E.00909
+G1 X57.449 Y85.811 F18000
+G1 E-.7 F2100
+G1 X78.956 Y101.327 Z.943 F18000
+G1 X82.141 Y103.624 Z1.003
+G1 X85.326 Y105.922 Z1.046
+G1 X91.696 Y110.518 Z1.08
+M486 S-1
+M486 S1
+G1 X224.169 Y206.084
+G1 Z.48 F720
+G1 E.7 F1500
+
+  [... 1 duplicate line(s) collapsed ...]
+G1 F9622.74
+G1 X25.844 Y206.084 E11.31063
+G1 X25.844 Y7.759 E11.31063
+M73 P23 R108
+G1 X224.169 Y7.759 
+>> ShellSession({'command': "sed -n '2970,3010p' /app/text.gcode", 'timeout': 10})
+<< M106 S178.5
+G1 X57.76 Y86.344 F18000
+G1 E-.7 F2100
+G1 X79.285 Y101.833 Z1.223 F18000
+G1 X82.473 Y104.127 Z1.283
+G1 X85.661 Y106.421 Z1.326
+G1 X92.037 Y111.009 Z1.36
+M486 S-1
+M486 S1
+G1 X224.169 Y206.084
+G1 Z.76 F720
+G1 E.7 F1500
+
+  [... 1 duplicate line(s) collapsed ...]
+G1 F9622.74
+G1 X25.844 Y206.084 E11.31063
+G1 X25.844 Y7.759 E11.31063
+G1 X224.169 Y7.759 E11.31063
+G1 X224.169 Y206.024 E11.3072
+>> ShellSession({'command': "sed -n '1400,1420p' /app/text.gcode", 'timeout': 10})
+<< G1 X35.397 Y171.498 Z.766
+G1 X37.484 Y163.926 Z.8
+G1 X59.85 Y82.771 Z.8
+
+  [... 1 duplicate line(s) collapsed ...]
+M74 W9.87671
+
+M104 S225 
+M486 S-1
+M486 S0
+G1 X59.85 Y82.771
+G1 Z.48 F720
+G1 E.7 F1500
+M204 P1500
+
+  [... 1 duplicate line(s) collapsed ...]
+M106 S127.5
+G1 F900
+G1 X59.605 Y83.25 E.03471
+
+G1 X59.361 Y83.729 E.032
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': "sed -n '1408,1450p' /app/text.gcode", 'timeout': 10})
+<< M486 S-1
+M486 S0
+G1 X59.85 Y82.771
+G1 Z.48 F720
+G1 E.7 F1500
+M204 P1500
+
+  [... 1 duplicate line(s) collapsed ...]
+M106 S127.5
+G1 F900
+G1 X59.605 Y83.25 E.03471
+
+G1 X59.361 Y83.729 E.032
+
+G1 X59.117 Y84.209 E.02937
+
+G1 X58.873 Y84.688 E.02664
+
+G1 X58.628 Y85.167 E.02398
+M106 S89.25
+M204 P4000
+G1 X58.81 Y84.811 F18000
+G1 E-.7 F2100
+G1 X59.85 Y82.771 Z.52 F18000
+G1 Z.48 F720
+G1 E.7 F1500
+M204 P1500
+
+>> ShellSession({'command': 'cat > /tmp/extract_text4.py << \'PYEOF\'\nimport re\nfrom collections import defaultdict\n\n# Read gcode\nwith open(\'/app/text.gcode\', \'r\') as f:\n    lines = f.readlines()\n\n# Extract G1 moves with Z values\nmoves = []\nfor line in lines:\n    line = line.strip()\n    if line.startswith(\'G1 \'):\n        parts = line.split()\n        x = y = z = None\n        for p in parts:\n            if p.startswith(\'X\'):\n                x = float(p[1:])\n            elif p.startswith(\'Y\'):\n                y = float(p[1:])\n            elif p.startswith(\'Z\'):\n                z = float(p[1:])\n        if x is not None and y is not None and z is not None:\n            moves.append((x, y, z))\n\n# The text is "Embossed text" and it\'s printed on top of the base layers\n# The Z values for the text are around 0.2 to 1.36mm\n# Let\'s look at the text region more carefully\n\n# The text region seems to be around X=57-105, Y=82-110\n# Let\'s extract all moves in this region and look at the Z pattern\n\ntext_moves = [(m[0], m[1], m[2]) for m in moves if 55 <= m[0] <= 105 and 80 <= m[1] <= 112]\n\n# Sort by Z\ntext_moves_sorted = sorted(text_moves, key=lambda m: m[2])\n\n# Print unique Z values and their positions\nz_groups = {}\nfor m in text_moves:\n    z_rounded = round(m[2], 3)\n    if z_rounded not in z_groups:\n        z_groups[z_rounded] = []\n    z_groups[z_rounded].append((m[0], m[1]))\n\nprint("Z values in text region:")\nfor z in sorted(z_groups.keys()):\n    positions = z_groups[z]\n    xs = [p[0] for p in positions]\n    ys = [p[1] for p in positions]\n    print(f"  Z={z:.3f}: {len(positions)} points, X=[{min(xs):.3f},{max(xs):.3f}], Y=[{min(ys):.3f},{max(ys):.3f}]")\n\nPYEOF\npython3 /tmp/extract_text4.py', 'timeout': 60})
+<< Z values in text region:
+  Z=0.291: 1 points, X=[60.288,60.288], Y=[81.311,81.311]
+  Z=0.520: 1 points, X=[59.850,59.850], Y=[82.771,82.771]
+  Z=0.561: 1 points, X=[57.299,57.299], Y=[86.176,86.176]
+  Z=0.663: 1 points, X=[81.669,81.669], Y=[96.788,96.788]
+  Z=0.723: 1 points, X=[84.786,84.786], Y=[99.177,99.177]
+  Z=0.766: 1 points, X=[87.903,87.903], Y=[101.567,101.567]
+  Z=0.800: 2 points, X=[5
+
+=== pi notifications (3) ===
+[info] little-coder scaffold loaded
+[info] finalize-warn: 5 turns left at 36/40
+[warning] quality-monitor: empty_response → injecting correction

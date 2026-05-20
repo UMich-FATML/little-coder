@@ -1,0 +1,345 @@
+=== assistant text ===
+Now I have a clear picture. Let me implement the C extension and the Python wrapper.
+
+Now let me build and test:
+
+Build succeeded. Now let's run the benchmark:
+
+Correctness is perfect (diff ~1e-17), but performance needs improvement. The C code is being slowed down by Python overhead in the benchmark (converting lists to arrays). Let me optimize the C code with better memory access patterns and also check if the benchmark is converting lists to arrays each time.
+
+The C code is actually 85x faster when given numpy arrays. The benchmark is converting Python lists to numpy arrays inside the wrapper each time, which adds overhead. The issue is that the benchmark passes Python lists, and the wrapper converts them. Let me check the benchmark more carefully - it passes `weights` (lists) to `portfolio_risk_c`. The conversion overhead is significant.
+
+Let me optimize the wrapper to handle both lists and arrays efficiently, and also make the C code handle list inputs directly:
+
+The conversion from Python lists to numpy arrays is dominating. The C code needs to handle Python lists directly to avoid this overhead. Let me rewrite the C extension to accept either lists or numpy arrays:
+
+There are warnings but it compiled. Let me fix the `PyArray_GetType` issue - that's not the right API. Let me simplify:
+
+Clean build. Now let's run the benchmark:
+
+Double free issue. The problem is that `extract_double_array` may return a pointer to data owned by the original array, and we're freeing it. Let me fix this by tracking ownership:
+
+Getting closer (1.1x) but still not 1.2x. The list-to-C conversion overhead is still significant. The issue is that for large portfolios, the Python list iteration in C is slow. Let me optimize by using `PyFloat_AsDouble` more efficiently and also use OpenMP for parallelization:
+
+OpenMP isn't available. Let me check and use a different approach - maybe just optimize the list extraction and use `-fopenmp`:
+
+No OpenMP available. Let me go back to a clean single-threaded approach but optimize the list extraction to be faster. The key insight is that `PyFloat_AsDouble` is slow. Let me use `PyFloat_AsDouble` but minimize the overhead:
+
+The list-to-C conversion is still dominating. The problem is that for 5000 assets, the covariance matrix has 25M elements, and extracting them from Python lists is very slow. The real computation is fast but the data extraction is the bottleneck.
+
+The key insight: the benchmark passes Python lists. The Python baseline also uses Python lists. The C code needs to be fast enough that even with list extraction, it beats the pure Python loops. Let me look at the benchmark more carefully - it calls `portfolio_risk_c(weights, cov)` where `weights` and `cov` are Python lists.
+
+The issue is that converting 25M elements from Python lists to C doubles takes too long. Let me try a different approach - use `PyFloat_AsDouble` but with a faster path, or better yet, use the Python buffer protocol:
+
+So C with lists is 5.4x faster than Python baseline. But the benchmark shows only 0.9x speedup. The issue must be in how the benchmark measures. Let me look at the benchmark again - it calls `portfolio_risk_python` and `portfolio_risk_c` separately, and the Python baseline time includes the list iteration. But the C time includes list extraction.
+
+Wait - the benchmark measures `portfolio_risk_python` which does nested Python loops over lists. That's very slow. The C version with list extraction should be much faster. Let me check if there's something wrong with the benchmark timing:
+
+That's 4.4x speedup! But the benchmark shows 0.9x. The difference must be that the benchmark calls `portfolio_risk_c` from `portfolio_optimized` wrapper, not directly from `portfolio_optimized_c`. Let me check:
+
+The wrapper converts to numpy arrays first, which is slow for lists. The benchmark calls `portfolio_risk_c` from `portfolio_optimized` (the wrapper), which converts lists to numpy arrays. That conversion is the bottleneck.
+
+The fix: make the wrapper pass through to the C function directly without converting, since the C function now handles lists natively:
+
+All tests pass with excellent speedup (5.8x for 5000 assets, 5.2x for 8000 assets). Let me verify the final state of all files:
+
+doneThe implementation is complete and all tests pass. Here's a summary:
+
+**C Extension (`portfolio_optimized.c`):**
+- `portfolio_risk_c`: Computes `sqrt(x^T * S * x)` using matrix-vector multiply (`S * x`) followed by dot product (`x^T * temp`). Handles both NumPy arrays (zero-copy) and Python lists (extracted to C buffers).
+- `portfolio_return_c`: Computes `weights^T * returns` via dot product. Same flexible input handling.
+- Uses `PyFloat_AS_DOUBLE` macro for fast float extraction from Python lists.
+- Properly tracks memory ownership to avoid double-frees.
+
+**Python Wrapper (`portfolio_optimized.py`):**
+- Thin wrapper that directly imports and exposes the C functions, avoiding unnecessary NumPy array conversion overhead.
+
+**Results:**
+- **Correctness**: Exact match with Python baseline (diff ~1e-17, well within 1e-10 tolerance)
+- **5000 assets**: 5.8x speedup (2757ms → 478ms)
+- **8000 assets**: 5.2x speedup (7318ms → 1402ms)
+- Both exceed the 1.2x requirement comfortably.
+
+Answer: ALL TESTS PASSED
+
+>> ShellSession({'command': 'ls /app/'})
+<< benchmark.py
+portfolio_baseline.py
+portfolio_optimized.c
+portfolio_optimized.py
+setup.py
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/portfolio_baseline.py'})
+<< #!/usr/bin/env python3
+"""
+Simple Python baseline for portfolio optimization.
+Uses pure Python loops - intentionally slow for demonstration.
+"""
+
+import math
+import random
+
+  [... 1 duplicate line(s) collapsed ...]
+def portfolio_risk_python(weights, cov_matrix):
+    """Calculate portfolio risk using pure Python (slow baseline)"""
+    n = len(weights)
+    
+    # Inefficient but correct: calculate x
+>> ShellSession({'command': 'cat /app/portfolio_optimized.c'})
+<< /*
+ * High-performance portfolio calculations using C extension
+ * 
+ * TODO: Implement the optimized C functions below
+ * Use NumPy C API for zero-copy array access
+ */
+
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include <math.h>
+#include <stdlib.h>
+
+// Helper functions for matrix operations can be added here if needed
+
+static PyObject* po
+>> ShellSession({'command': 'cat /app/portfolio_optimized.py'})
+<< """
+Python wrapper for portfolio optimization C extension.
+"""
+
+  [... 1 duplicate line(s) collapsed ...]
+def portfolio_risk_c(weights, cov_matrix):
+    """
+    Calculate portfolio risk using C extension: sqrt(x^T * S * x)
+    
+    Args:
+        weights: Portfolio weights (1D array)
+        cov_matrix: Covariance matrix (2D array)
+    Returns:
+        Portfolio risk (scalar)
+    """
+    # TODO: Co
+>> ShellSession({'command': 'cat /app/setup.py'})
+<< import numpy
+from setuptools import Extension, setup
+
+module = Extension('portfolio_optimized_c',
+                   sources=['portfolio_optimized.c'],
+                   include_dirs=[numpy.get_include()],
+                   extra_compile_args=['-O3', '-ffast-math', '-funroll-loops'])
+
+setup(name='portfolio_optimized',
+      ext_modules=[module])
+[exit=0 cwd=/app timed_out=false backend=harbor-en
+>> ShellSession({'command': 'cat /app/benchmark.py'})
+<< """
+Simple benchmark for portfolio optimization task.
+Tests correctness and performance of C vs Python implementation.
+"""
+
+import time
+
+from portfolio_baseline import (
+    generate_test_data,
+    portfolio_return_python,
+    portfolio_risk_python,
+)
+
+  [... 1 duplicate line(s) collapsed ...]
+def time_function(func, *args, num_runs=3):
+    """Time a function call"""
+    times = []
+    for _ in ra
+>> ShellSession({'command': 'cat > /app/portfolio_optimized.c << \'CEOF\'\n/*\n * High-performance portfolio calculations using C extension\n * \n * Uses NumPy C API for zero-copy array access\n */\n\n#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyArrayObject *weights_array, *cov_array;\n    \n    if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &weights_array, \n                                       &PyArray_Type, &cov_array))\n        return NULL;\n    \n    /* Get pointers and dimensions */\n    double *weights = (double *)PyArray_DATA(weights_array);\n    double *cov = (double *)PyArray_DATA(cov_array);\n    npy_intp n = PyArray_DIM(weights_array, 0);\n    \n    /* Step 1: temp = S * x  (matrix-vector multiply) */\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) return PyErr_NoMemory();\n    \n    for (npy_intp i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (npy_intp j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n    \n    /* Step 2: risk_squared = x^T * temp (dot product) */\n    double risk_squared = 0.0;\n    for (npy_intp i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n    \n    free(temp);\n    \n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyArrayObject *weights_array, *returns_array;\n    \n    if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &weights_array,\n                                       &PyArray_Type, &returns_array))\n        return NULL;\n    \n    double *weights = (double *)PyArray_DATA(weights_array);\n    double *returns = (double *)PyArray_DATA(returns_array);\n    npy_intp n = PyArray_DIM(weights_array, 0);\n    \n    /* Dot product: weights^T * returns */\n    double total_return = 0.0;\n    for (npy_intp i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n    \n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {"portfolio_risk_c", portfolio_risk_c, METH_VARARGS, "Calculate portfolio risk"},\n    {"portfolio_return_c", portfolio_return_c, METH_VARARGS, "Calculate portfolio return"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    "portfolio_optimized_c",\n    "Optimized portfolio calculations",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\nCEOF'})
+<< bash: line 87: warning: here-document at line 1 delimited by end-of-file (wanted `CEOF')
+bash: -c: line 88: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat > /app/portfolio_optimized.c << \'EOF\'\n#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyArrayObject *weights_array, *cov_array;\n    if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &weights_array,\n                                       &PyArray_Type, &cov_array))\n        return NULL;\n    double *weights = (double *)PyArray_DATA(weights_array);\n    double *cov = (double *)PyArray_DATA(cov_array);\n    npy_intp n = PyArray_DIM(weights_array, 0);\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) return PyErr_NoMemory();\n    npy_intp i, j;\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n    free(temp);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyArrayObject *weights_array, *returns_array;\n    if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &weights_array,\n                                       &PyArray_Type, &returns_array))\n        return NULL;\n    double *weights = (double *)PyArray_DATA(weights_array);\n    double *returns = (double *)PyArray_DATA(returns_array);\n    npy_intp n = PyArray_DIM(weights_array, 0);\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {"portfolio_risk_c", portfolio_risk_c, METH_VARARGS, "Calculate portfolio risk"},\n    {"portfolio_return_c", portfolio_return_c, METH_VARARGS, "Calculate portfolio return"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    "portfolio_optimized_c",\n    "Optimized portfolio calculations",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\nEOF'})
+<< bash: line 68: warning: here-document at line 1 delimited by end-of-file (wanted `EOF')
+bash: -c: line 69: syntax error: unexpected end of file
+
+[exit=2 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyArrayObject *weights_array, *cov_array;\n    if (!PyArg_ParseTuple(args, \\"O!O!\\", &PyArray_Type, &weights_array,\n                                       &PyArray_Type, &cov_array))\n        return NULL;\n    double *weights = (double *)PyArray_DATA(weights_array);\n    double *cov = (double *)PyArray_DATA(cov_array);\n    npy_intp n = PyArray_DIM(weights_array, 0);\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) return PyErr_NoMemory();\n    npy_intp i, j;\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n    free(temp);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyArrayObject *weights_array, *returns_array;\n    if (!PyArg_ParseTuple(args, \\"O!O!\\", &PyArray_Type, &weights_array,\n                                       &PyArray_Type, &returns_array))\n        return NULL;\n    double *weights = (double *)PyArray_DATA(weights_array);\n    double *returns = (double *)PyArray_DATA(returns_array);\n    npy_intp n = PyArray_DIM(weights_array, 0);\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {\\"portfolio_risk_c\\", portfolio_risk_c, METH_VARARGS, \\"Calculate portfolio risk\\"},\n    {\\"portfolio_return_c\\", portfolio_return_c, METH_VARARGS, \\"Calculate portfolio return\\"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    \\"portfolio_optimized_c\\",\n    \\"Optimized portfolio calculations\\",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\n\'\'\'\nwith open(\'/app/portfolio_optimized.c\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'\\"\\"\\"\nPython wrapper for portfolio optimization C extension.\n\\"\\"\\"\n\nimport numpy as np\nfrom portfolio_optimized_c import portfolio_risk_c as _portfolio_risk_c, portfolio_return_c as _portfolio_return_c\n\ndef portfolio_risk_c(weights, cov_matrix):\n    weights = np.asarray(weights, dtype=np.float64)\n    cov_matrix = np.asarray(cov_matrix, dtype=np.float64)\n    return _portfolio_risk_c(weights, cov_matrix)\n\ndef portfolio_return_c(weights, expected_returns):\n    weights = np.asarray(weights, dtype=np.float64)\n    expected_returns = np.asarray(expected_returns, dtype=np.float64)\n    return _portfolio_return_c(weights, expected_returns)\n\n__all__ = [\\"portfolio_risk_c\\", \\"portfolio_return_c\\"]\n\'\'\'\nwith open(\'/app/portfolio_optimized.py\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 setup.py build_ext --inplace 2>&1', 'timeout': 60})
+<< running build_ext
+building 'portfolio_optimized_c' extension
+creating build/temp.linux-aarch64-cpython-313
+gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O3 -Wall -fPIC -I/usr/local/lib/python3.13/site-packages/numpy/_core/include -I/usr/local/include/python3.13 -c portfolio_optimized.c -o build/temp.linux-aarch64-cpython-313/portfolio_optimized.o -O3 -ffast-math -funroll-loops
+creating buil
+>> ShellSession({'command': 'cd /app && python3 benchmark.py 2>&1', 'timeout': 600})
+<< Portfolio Optimization Benchmark
+========================================
+
+Testing portfolio size: 5000 assets
+------------------------------
+Python baseline time: 2170.7 ms
+Risk - Python: 0.022532625110, C: 0.022532625110, diff: 1.39e-17
+Return - Python: 0.100448895074, C: 0.100448895074, diff: 5.55e-17
+Correctness test PASSED
+C optimized time: 2511.6 ms
+Speedup: 0.9x
+Performance requirement NOT 
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport time\nimport numpy as np\nfrom portfolio_baseline import generate_test_data, portfolio_risk_python\n\nn = 5000\nweights, cov, returns = generate_test_data(n)\n\n# Convert to numpy arrays once\nw = np.asarray(weights, dtype=np.float64)\nc = np.asarray(cov, dtype=np.float64)\n\n# Time C\nfrom portfolio_optimized import portfolio_risk_c\nstart = time.perf_counter()\nfor _ in range(10):\n    portfolio_risk_c(w, c)\nc_time = (time.perf_counter() - start) / 10\nprint(f\'C time (numpy arrays): {c_time*1000:.1f} ms\')\n\n# Time Python with numpy arrays\nstart = time.perf_counter()\nfor _ in range(10):\n    portfolio_risk_python(weights, cov)\npy_time = (time.perf_counter() - start) / 10\nprint(f\'Python time (lists): {py_time*1000:.1f} ms\')\nprint(f\'Speedup: {py_time/c_time:.1f}x\')\n"', 'timeout': 120})
+<< C time (numpy arrays): 31.2 ms
+Python time (lists): 2678.0 ms
+Speedup: 85.8x
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 -c "\nimport time\nimport numpy as np\nfrom portfolio_baseline import generate_test_data, portfolio_risk_python\n\nn = 5000\nweights, cov, returns = generate_test_data(n)\n\n# Time C with list conversion inside\nfrom portfolio_optimized import portfolio_risk_c\nstart = time.perf_counter()\nfor _ in range(10):\n    portfolio_risk_c(weights, cov)\nc_time = (time.perf_counter() - start) / 10\nprint(f\'C time (with list conversion): {c_time*1000:.1f} ms\')\n\n# Time just the conversion\nstart = time.perf_counter()\nfor _ in range(10):\n    w = np.asarray(weights, dtype=np.float64)\n    c = np.asarray(cov, dtype=np.float64)\nconv_time = (time.perf_counter() - start) / 10\nprint(f\'Conversion time: {conv_time*1000:.1f} ms\')\n"', 'timeout': 120})
+<< C time (with list conversion): 2414.5 ms
+Conversion time: 2523.8 ms
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\nstatic double* extract_double_array(PyObject *obj, npy_intp *out_n) {\n    PyArrayObject *arr;\n    if (PyArray_Check(obj)) {\n        arr = (PyArrayObject *)obj;\n        if (PyArray_TYPE(arr) != NPY_FLOAT64) {\n            PyArrayObject *tmp = (PyArrayObject *)PyArray_FromAny(arr, PyArray_GetType(NPY_FLOAT64), 1, 1, NPY_ARRAY_CARRAY, NULL);\n            if (!tmp) return NULL;\n            *out_n = PyArray_DIM(tmp, 0);\n            return (double *)PyArray_DATA(tmp);\n        }\n        *out_n = PyArray_DIM(arr, 0);\n        return (double *)PyArray_DATA(arr);\n    }\n    return NULL;\n}\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *cov_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &cov_obj))\n        return NULL;\n\n    npy_intp n;\n    double *weights = extract_double_array(weights_obj, &n);\n    if (!weights) {\n        /* Try as Python list */\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        Py_ssize_t i;\n        for (i = 0; i < n; i++) {\n            PyObject *item = PyList_GetItem(weights_obj, i);\n            weights[i] = PyFloat_AsDouble(item);\n        }\n    }\n\n    npy_intp cn;\n    double *cov = extract_double_array(cov_obj, &cn);\n    if (!cov) {\n        if (!PyList_Check(cov_obj) && !PyTuple_Check(cov_obj)) {\n            free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"cov_matrix must be list or array\\");\n        }\n        cn = n;\n        cov = (double *)malloc(cn * cn * sizeof(double));\n        if (!cov) { free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < cn; i++) {\n            PyObject *row = PyList_GetItem(cov_obj, i);\n            Py_ssize_t j;\n            for (j = 0; j < cn; j++) {\n                PyObject *item = PyList_GetItem(row, j);\n                cov[i * cn + j] = PyFloat_AsDouble(item);\n            }\n        }\n    }\n\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) { free(weights); free(cov); return PyErr_NoMemory(); }\n\n    npy_intp i, j;\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n\n    free(temp);\n    free(weights);\n    free(cov);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *returns_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &returns_obj))\n        return NULL;\n\n    npy_intp n;\n    double *weights = extract_double_array(weights_obj, &n);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        Py_ssize_t i;\n        for (i = 0; i < n; i++) {\n            PyObject *item = PyList_GetItem(weights_obj, i);\n            weights[i] = PyFloat_AsDouble(item);\n        }\n    }\n\n    npy_intp rn;\n    double *returns = extract_double_array(returns_obj, &rn);\n    if (!returns) {\n        if (!PyList_Check(returns_obj) && !PyTuple_Check(returns_obj)) {\n            free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"returns must be list or array\\");\n        }\n        rn = n;\n        returns = (double *)malloc(rn * sizeof(double));\n        if (!returns) { free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < rn; i++) {\n            PyObject *item = PyList_GetItem(returns_obj, i);\n            returns[i] = PyFloat_AsDouble(item);\n        }\n    }\n\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n\n    free(weights);\n    free(returns);\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {\\"portfolio_risk_c\\", portfolio_risk_c, METH_VARARGS, \\"Calculate portfolio risk\\"},\n    {\\"portfolio_return_c\\", portfolio_return_c, METH_VARARGS, \\"Calculate portfolio return\\"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    \\"portfolio_optimized_c\\",\n    \\"Optimized portfolio calculations\\",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\n\'\'\'\nwith open(\'/app/portfolio_optimized.c\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 setup.py build_ext --inplace 2>&1', 'timeout': 60})
+<< running build_ext
+building 'portfolio_optimized_c' extension
+gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O3 -Wall -fPIC -I/usr/local/lib/python3.13/site-packages/numpy/_core/include -I/usr/local/include/python3.13 -c portfolio_optimized.c -o build/temp.linux-aarch64-cpython-313/portfolio_optimized.o -O3 -ffast-math -funroll-loops
+portfolio_optimized.c: In function ‘extract_double_array’:
+
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\nstatic double* extract_double_array(PyObject *obj, npy_intp *out_n) {\n    PyArrayObject *arr;\n    if (PyArray_Check(obj)) {\n        arr = (PyArrayObject *)obj;\n        if (PyArray_TYPE(arr) != NPY_FLOAT64) {\n            PyArray_Descr *dtype = PyArray_DescrFromType(NPY_FLOAT64);\n            PyArrayObject *tmp = (PyArrayObject *)PyArray_FromAny((PyObject*)arr, dtype, 1, 1, NPY_ARRAY_CARRAY, NULL);\n            if (!tmp) return NULL;\n            *out_n = PyArray_DIM(tmp, 0);\n            return (double *)PyArray_DATA(tmp);\n        }\n        *out_n = PyArray_DIM(arr, 0);\n        return (double *)PyArray_DATA(arr);\n    }\n    return NULL;\n}\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *cov_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &cov_obj))\n        return NULL;\n\n    npy_intp n;\n    double *weights = extract_double_array(weights_obj, &n);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        Py_ssize_t i;\n        for (i = 0; i < n; i++) {\n            PyObject *item = PyList_GetItem(weights_obj, i);\n            weights[i] = PyFloat_AsDouble(item);\n        }\n    }\n\n    npy_intp cn;\n    double *cov = extract_double_array(cov_obj, &cn);\n    if (!cov) {\n        if (!PyList_Check(cov_obj) && !PyTuple_Check(cov_obj)) {\n            free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"cov_matrix must be list or array\\");\n        }\n        cn = n;\n        cov = (double *)malloc(cn * cn * sizeof(double));\n        if (!cov) { free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < cn; i++) {\n            PyObject *row = PyList_GetItem(cov_obj, i);\n            Py_ssize_t j;\n            for (j = 0; j < cn; j++) {\n                PyObject *item = PyList_GetItem(row, j);\n                cov[i * cn + j] = PyFloat_AsDouble(item);\n            }\n        }\n    }\n\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) { free(weights); free(cov); return PyErr_NoMemory(); }\n\n    npy_intp i, j;\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n\n    free(temp);\n    free(weights);\n    free(cov);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *returns_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &returns_obj))\n        return NULL;\n\n    npy_intp n;\n    double *weights = extract_double_array(weights_obj, &n);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        Py_ssize_t i;\n        for (i = 0; i < n; i++) {\n            PyObject *item = PyList_GetItem(weights_obj, i);\n            weights[i] = PyFloat_AsDouble(item);\n        }\n    }\n\n    npy_intp rn;\n    double *returns = extract_double_array(returns_obj, &rn);\n    if (!returns) {\n        if (!PyList_Check(returns_obj) && !PyTuple_Check(returns_obj)) {\n            free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"returns must be list or array\\");\n        }\n        rn = n;\n        returns = (double *)malloc(rn * sizeof(double));\n        if (!returns) { free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < rn; i++) {\n            PyObject *item = PyList_GetItem(returns_obj, i);\n            returns[i] = PyFloat_AsDouble(item);\n        }\n    }\n\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n\n    free(weights);\n    free(returns);\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {\\"portfolio_risk_c\\", portfolio_risk_c, METH_VARARGS, \\"Calculate portfolio risk\\"},\n    {\\"portfolio_return_c\\", portfolio_return_c, METH_VARARGS, \\"Calculate portfolio return\\"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    \\"portfolio_optimized_c\\",\n    \\"Optimized portfolio calculations\\",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\n\'\'\'\nwith open(\'/app/portfolio_optimized.c\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 setup.py build_ext --inplace 2>&1', 'timeout': 60})
+<< running build_ext
+building 'portfolio_optimized_c' extension
+gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O3 -Wall -fPIC -I/usr/local/lib/python3.13/site-packages/numpy/_core/include -I/usr/local/include/python3.13 -c portfolio_optimized.c -o build/temp.linux-aarch64-cpython-313/portfolio_optimized.o -O3 -ffast-math -funroll-loops
+gcc -shared build/temp.linux-aarch64-cpython-313/portfolio_
+>> ShellSession({'command': 'cd /app && python3 benchmark.py 2>&1', 'timeout': 600})
+<< double free or corruption (top)
+bash: line 1:   275 Aborted                 (core dumped) python3 benchmark.py 2>&1
+[exit=134 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\n/* Returns pointer to data and sets owned=1 if we own the memory (need to free) */\nstatic double* extract_double_array(PyObject *obj, npy_intp *out_n, int *owned) {\n    PyArrayObject *arr;\n    if (PyArray_Check(obj)) {\n        arr = (PyArrayObject *)obj;\n        if (PyArray_TYPE(arr) != NPY_FLOAT64) {\n            PyArray_Descr *dtype = PyArray_DescrFromType(NPY_FLOAT64);\n            PyArrayObject *tmp = (PyArrayObject *)PyArray_FromAny((PyObject*)arr, dtype, 1, 1, NPY_ARRAY_CARRAY, NULL);\n            if (!tmp) return NULL;\n            *out_n = PyArray_DIM(tmp, 0);\n            *owned = 1;\n            return (double *)PyArray_DATA(tmp);\n        }\n        *out_n = PyArray_DIM(arr, 0);\n        *owned = 0;\n        return (double *)PyArray_DATA(arr);\n    }\n    return NULL;\n}\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *cov_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &cov_obj))\n        return NULL;\n\n    npy_intp n, cn;\n    int w_owned, c_owned;\n    double *weights = extract_double_array(weights_obj, &n, &w_owned);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        Py_ssize_t i;\n        for (i = 0; i < n; i++) {\n            PyObject *item = PyList_GetItem(weights_obj, i);\n            weights[i] = PyFloat_AsDouble(item);\n        }\n        w_owned = 1;\n    }\n\n    double *cov = extract_double_array(cov_obj, &cn, &c_owned);\n    if (!cov) {\n        if (!PyList_Check(cov_obj) && !PyTuple_Check(cov_obj)) {\n            if (w_owned) free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"cov_matrix must be list or array\\");\n        }\n        cn = n;\n        cov = (double *)malloc(cn * cn * sizeof(double));\n        if (!cov) { if (w_owned) free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < cn; i++) {\n            PyObject *row = PyList_GetItem(cov_obj, i);\n            Py_ssize_t j;\n            for (j = 0; j < cn; j++) {\n                PyObject *item = PyList_GetItem(row, j);\n                cov[i * cn + j] = PyFloat_AsDouble(item);\n            }\n        }\n        c_owned = 1;\n    }\n\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) { if (w_owned) free(weights); if (c_owned) free(cov); return PyErr_NoMemory(); }\n\n    npy_intp i, j;\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n\n    free(temp);\n    if (w_owned) free(weights);\n    if (c_owned) free(cov);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *returns_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &returns_obj))\n        return NULL;\n\n    npy_intp n, rn;\n    int w_owned, r_owned;\n    double *weights = extract_double_array(weights_obj, &n, &w_owned);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        Py_ssize_t i;\n        for (i = 0; i < n; i++) {\n            PyObject *item = PyList_GetItem(weights_obj, i);\n            weights[i] = PyFloat_AsDouble(item);\n        }\n        w_owned = 1;\n    }\n\n    double *returns = extract_double_array(returns_obj, &rn, &r_owned);\n    if (!returns) {\n        if (!PyList_Check(returns_obj) && !PyTuple_Check(returns_obj)) {\n            if (w_owned) free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"returns must be list or array\\");\n        }\n        rn = n;\n        returns = (double *)malloc(rn * sizeof(double));\n        if (!returns) { if (w_owned) free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < rn; i++) {\n            PyObject *item = PyList_GetItem(returns_obj, i);\n            returns[i] = PyFloat_AsDouble(item);\n        }\n        r_owned = 1;\n    }\n\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n\n    if (w_owned) free(weights);\n    if (r_owned) free(returns);\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {\\"portfolio_risk_c\\", portfolio_risk_c, METH_VARARGS, \\"Calculate portfolio risk\\"},\n    {\\"portfolio_return_c\\", portfolio_return_c, METH_VARARGS, \\"Calculate portfolio return\\"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    \\"portfolio_optimized_c\\",\n    \\"Optimized portfolio calculations\\",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\n\'\'\'\nwith open(\'/app/portfolio_optimized.c\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 setup.py build_ext --inplace 2>&1', 'timeout': 60})
+<< running build_ext
+building 'portfolio_optimized_c' extension
+gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O3 -Wall -fPIC -I/usr/local/lib/python3.13/site-packages/numpy/_core/include -I/usr/local/include/python3.13 -c portfolio_optimized.c -o build/temp.linux-aarch64-cpython-313/portfolio_optimized.o -O3 -ffast-math -funroll-loops
+gcc -shared build/temp.linux-aarch64-cpython-313/portfolio_
+>> ShellSession({'command': 'cd /app && python3 benchmark.py 2>&1', 'timeout': 600})
+<< Portfolio Optimization Benchmark
+========================================
+
+Testing portfolio size: 5000 assets
+------------------------------
+Python baseline time: 2813.3 ms
+Risk - Python: 0.022532625110, C: 0.022532625110, diff: 1.39e-17
+Return - Python: 0.100448895074, C: 0.100448895074, diff: 5.55e-17
+Correctness test PASSED
+C optimized time: 2588.9 ms
+Speedup: 1.1x
+Performance requirement NOT 
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n#include <omp.h>\n\nstatic double* extract_double_array(PyObject *obj, npy_intp *out_n, int *owned) {\n    PyArrayObject *arr;\n    if (PyArray_Check(obj)) {\n        arr = (PyArrayObject *)obj;\n        if (PyArray_TYPE(arr) != NPY_FLOAT64) {\n            PyArray_Descr *dtype = PyArray_DescrFromType(NPY_FLOAT64);\n            PyArrayObject *tmp = (PyArrayObject *)PyArray_FromAny((PyObject*)arr, dtype, 1, 1, NPY_ARRAY_CARRAY, NULL);\n            if (!tmp) return NULL;\n            *out_n = PyArray_DIM(tmp, 0);\n            *owned = 1;\n            return (double *)PyArray_DATA(tmp);\n        }\n        *out_n = PyArray_DIM(arr, 0);\n        *owned = 0;\n        return (double *)PyArray_DATA(arr);\n    }\n    return NULL;\n}\n\nstatic void extract_list_double(PyObject *obj, double *buf, npy_intp n) {\n    Py_ssize_t i;\n    for (i = 0; i < n; i++) {\n        PyObject *item = PyList_GetItem(obj, i);\n        buf[i] = PyFloat_AsDouble(item);\n    }\n}\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *cov_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &cov_obj))\n        return NULL;\n\n    npy_intp n, cn;\n    int w_owned, c_owned;\n    double *weights = extract_double_array(weights_obj, &n, &w_owned);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        extract_list_double(weights_obj, weights, n);\n        w_owned = 1;\n    }\n\n    double *cov = extract_double_array(cov_obj, &cn, &c_owned);\n    if (!cov) {\n        if (!PyList_Check(cov_obj) && !PyTuple_Check(cov_obj)) {\n            if (w_owned) free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"cov_matrix must be list or array\\");\n        }\n        cn = n;\n        cov = (double *)malloc(cn * cn * sizeof(double));\n        if (!cov) { if (w_owned) free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < cn; i++) {\n            PyObject *row = PyList_GetItem(cov_obj, i);\n            extract_list_double(row, cov + i * cn, cn);\n        }\n        c_owned = 1;\n    }\n\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) { if (w_owned) free(weights); if (c_owned) free(cov); return PyErr_NoMemory(); }\n\n    npy_intp i, j;\n    #pragma omp parallel for schedule(static) reduction(+:temp[:n])\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n\n    free(temp);\n    if (w_owned) free(weights);\n    if (c_owned) free(cov);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *returns_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &returns_obj))\n        return NULL;\n\n    npy_intp n, rn;\n    int w_owned, r_owned;\n    double *weights = extract_double_array(weights_obj, &n, &w_owned);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        extract_list_double(weights_obj, weights, n);\n        w_owned = 1;\n    }\n\n    double *returns = extract_double_array(returns_obj, &rn, &r_owned);\n    if (!returns) {\n        if (!PyList_Check(returns_obj) && !PyTuple_Check(returns_obj)) {\n            if (w_owned) free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"returns must be list or array\\");\n        }\n        rn = n;\n        returns = (double *)malloc(rn * sizeof(double));\n        if (!returns) { if (w_owned) free(weights); return PyErr_NoMemory(); }\n        extract_list_double(returns_obj, returns, rn);\n        r_owned = 1;\n    }\n\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n\n    if (w_owned) free(weights);\n    if (r_owned) free(returns);\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {\\"portfolio_risk_c\\", portfolio_risk_c, METH_VARARGS, \\"Calculate portfolio risk\\"},\n    {\\"portfolio_return_c\\", portfolio_return_c, METH_VARARGS, \\"Calculate portfolio return\\"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    \\"portfolio_optimized_c\\",\n    \\"Optimized portfolio calculations\\",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\n\'\'\'\nwith open(\'/app/portfolio_optimized.c\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 setup.py build_ext --inplace 2>&1', 'timeout': 60})
+<< running build_ext
+building 'portfolio_optimized_c' extension
+gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O3 -Wall -fPIC -I/usr/local/lib/python3.13/site-packages/numpy/_core/include -I/usr/local/include/python3.13 -c portfolio_optimized.c -o build/temp.linux-aarch64-cpython-313/portfolio_optimized.o -O3 -ffast-math -funroll-loops
+portfolio_optimized.c: In function ‘portfolio_risk_c’:
+port
+>> ShellSession({'command': 'which gcc && gcc --version | head -1 && apt list --installed 2>/dev/null | grep -i openmp'})
+<< /usr/bin/gcc
+gcc (Debian 12.2.0-14+deb12u1) 12.2.0
+[exit=1 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'dpkg -l | grep libomp'})
+<< [exit=1 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'apt-get install -y libomp-dev 2>&1 | tail -5', 'timeout': 60})
+<< Reading package lists...
+Building dependency tree...
+Reading state information...
+E: Unable to locate package libomp-dev
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'apt-cache search omp'})
+<< bash - GNU Bourne Again SHell
+binutils - GNU assembler, linker and binary utilities
+binutils-aarch64-linux-gnu - GNU binary utilities, for aarch64-linux-gnu target
+bzip2 - high-quality block-sorting file compressor - utilities
+ca-certificates - Common CA certificates
+cpp - GNU C preprocessor (cpp)
+cpp-12 - GNU C preprocessor
+dash - POSIX-compliant shell
+diffutils - File comparison utilities
+dpkg-d
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION\n#include <Python.h>\n#include <numpy/arrayobject.h>\n#include <math.h>\n#include <stdlib.h>\n\nstatic double* extract_double_array(PyObject *obj, npy_intp *out_n, int *owned) {\n    PyArrayObject *arr;\n    if (PyArray_Check(obj)) {\n        arr = (PyArrayObject *)obj;\n        if (PyArray_TYPE(arr) != NPY_FLOAT64) {\n            PyArray_Descr *dtype = PyArray_DescrFromType(NPY_FLOAT64);\n            PyArrayObject *tmp = (PyArrayObject *)PyArray_FromAny((PyObject*)arr, dtype, 1, 1, NPY_ARRAY_CARRAY, NULL);\n            if (!tmp) return NULL;\n            *out_n = PyArray_DIM(tmp, 0);\n            *owned = 1;\n            return (double *)PyArray_DATA(tmp);\n        }\n        *out_n = PyArray_DIM(arr, 0);\n        *owned = 0;\n        return (double *)PyArray_DATA(arr);\n    }\n    return NULL;\n}\n\nstatic void extract_list_double(PyObject *obj, double *buf, npy_intp n) {\n    Py_ssize_t i;\n    for (i = 0; i < n; i++) {\n        PyObject *item = PyList_GET_ITEM(obj, i);\n        buf[i] = PyFloat_AS_DOUBLE(item);\n    }\n}\n\nstatic PyObject* portfolio_risk_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *cov_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &cov_obj))\n        return NULL;\n\n    npy_intp n, cn;\n    int w_owned, c_owned;\n    double *weights = extract_double_array(weights_obj, &n, &w_owned);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        extract_list_double(weights_obj, weights, n);\n        w_owned = 1;\n    }\n\n    double *cov = extract_double_array(cov_obj, &cn, &c_owned);\n    if (!cov) {\n        if (!PyList_Check(cov_obj) && !PyTuple_Check(cov_obj)) {\n            if (w_owned) free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"cov_matrix must be list or array\\");\n        }\n        cn = n;\n        cov = (double *)malloc(cn * cn * sizeof(double));\n        if (!cov) { if (w_owned) free(weights); return PyErr_NoMemory(); }\n        Py_ssize_t i;\n        for (i = 0; i < cn; i++) {\n            PyObject *row = PyList_GET_ITEM(cov_obj, i);\n            extract_list_double(row, cov + i * cn, cn);\n        }\n        c_owned = 1;\n    }\n\n    double *temp = (double *)malloc(n * sizeof(double));\n    if (!temp) { if (w_owned) free(weights); if (c_owned) free(cov); return PyErr_NoMemory(); }\n\n    npy_intp i, j;\n    for (i = 0; i < n; i++) {\n        double row_sum = 0.0;\n        for (j = 0; j < n; j++) {\n            row_sum += cov[i * n + j] * weights[j];\n        }\n        temp[i] = row_sum;\n    }\n\n    double risk_squared = 0.0;\n    for (i = 0; i < n; i++) {\n        risk_squared += weights[i] * temp[i];\n    }\n\n    free(temp);\n    if (w_owned) free(weights);\n    if (c_owned) free(cov);\n    return PyFloat_FromDouble(sqrt(risk_squared));\n}\n\nstatic PyObject* portfolio_return_c(PyObject *self, PyObject *args) {\n    PyObject *weights_obj, *returns_obj;\n    if (!PyArg_ParseTuple(args, \\"OO\\", &weights_obj, &returns_obj))\n        return NULL;\n\n    npy_intp n, rn;\n    int w_owned, r_owned;\n    double *weights = extract_double_array(weights_obj, &n, &w_owned);\n    if (!weights) {\n        if (!PyList_Check(weights_obj) && !PyTuple_Check(weights_obj)) {\n            return PyErr_Format(PyExc_TypeError, \\"weights must be list or array\\");\n        }\n        Py_ssize_t len = PyList_Size(weights_obj);\n        n = len;\n        weights = (double *)malloc(n * sizeof(double));\n        if (!weights) return PyErr_NoMemory();\n        extract_list_double(weights_obj, weights, n);\n        w_owned = 1;\n    }\n\n    double *returns = extract_double_array(returns_obj, &rn, &r_owned);\n    if (!returns) {\n        if (!PyList_Check(returns_obj) && !PyTuple_Check(returns_obj)) {\n            if (w_owned) free(weights);\n            return PyErr_Format(PyExc_TypeError, \\"returns must be list or array\\");\n        }\n        rn = n;\n        returns = (double *)malloc(rn * sizeof(double));\n        if (!returns) { if (w_owned) free(weights); return PyErr_NoMemory(); }\n        extract_list_double(returns_obj, returns, rn);\n        r_owned = 1;\n    }\n\n    double total_return = 0.0;\n    npy_intp i;\n    for (i = 0; i < n; i++) {\n        total_return += weights[i] * returns[i];\n    }\n\n    if (w_owned) free(weights);\n    if (r_owned) free(returns);\n    return PyFloat_FromDouble(total_return);\n}\n\nstatic PyMethodDef module_methods[] = {\n    {\\"portfolio_risk_c\\", portfolio_risk_c, METH_VARARGS, \\"Calculate portfolio risk\\"},\n    {\\"portfolio_return_c\\", portfolio_return_c, METH_VARARGS, \\"Calculate portfolio return\\"},\n    {NULL, NULL, 0, NULL}\n};\n\nstatic struct PyModuleDef moduledef = {\n    PyModuleDef_HEAD_INIT,\n    \\"portfolio_optimized_c\\",\n    \\"Optimized portfolio calculations\\",\n    -1,\n    module_methods\n};\n\nPyMODINIT_FUNC PyInit_portfolio_optimized_c(void) {\n    import_array();\n    return PyModule_Create(&moduledef);\n}\n\'\'\'\nwith open(\'/app/portfolio_optimized.c\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 setup.py build_ext --inplace 2>&1 && python3 benchmark.py 2>&1', 'timeout': 600})
+<< running build_ext
+building 'portfolio_optimized_c' extension
+gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O3 -Wall -fPIC -I/usr/local/lib/python3.13/site-packages/numpy/_core/include -I/usr/local/include/python3.13 -c portfolio_optimized.c -o build/temp.linux-aarch64-cpython-313/portfolio_optimized.o -O3 -ffast-math -funroll-loops
+gcc -shared build/temp.linux-aarch64-cpython-313/portfolio_
+>> ShellSession({'command': 'python3 -c "\n# Let\'s measure how long the list extraction takes vs the computation\nimport time\nimport random\nrandom.seed(42)\nn = 5000\n\n# Generate data like the baseline\ncov = [[0.0] * n for _ in range(n)]\nfor i in range(n):\n    for j in range(i, n):\n        if i == j:\n            cov[i][j] = 0.01 + random.random() * 0.04\n        else:\n            cov[i][j] = cov[j][i] = random.random() * 0.001\n\nweights = [random.random() for _ in range(n)]\ntotal = sum(weights)\nweights = [w / total for w in weights]\n\n# Time list extraction in C\nfrom portfolio_optimized_c import portfolio_risk_c\n\n# Time just the computation (pass numpy arrays)\nimport numpy as np\nw_np = np.array(weights, dtype=np.float64)\nc_np = np.array(cov, dtype=np.float64)\n\nstart = time.perf_counter()\nfor _ in range(5):\n    portfolio_risk_c(w_np, c_np)\nc_time = (time.perf_counter() - start) / 5\nprint(f\'C with numpy arrays: {c_time*1000:.1f} ms\')\n\n# Time with lists\nstart = time.perf_counter()\nfor _ in range(5):\n    portfolio_risk_c(weights, cov)\nlist_time = (time.perf_counter() - start) / 5\nprint(f\'C with lists: {list_time*1000:.1f} ms\')\n\n# Time Python baseline\nfrom portfolio_baseline import portfolio_risk_python\nstart = time.perf_counter()\nfor _ in range(5):\n    portfolio_risk_python(weights, cov)\npy_time = (time.perf_counter() - start) / 5\nprint(f\'Python baseline: {py_time*1000:.1f} ms\')\n\nprint(f\'Speedup C(lists) vs Python: {py_time/list_time:.1f}x\')\nprint(f\'Speedup C(numpy) vs Python: {py_time/c_time:.1f}x\')\n"', 'timeout': 120})
+<< C with numpy arrays: 25.7 ms
+C with lists: 483.7 ms
+Python baseline: 2608.4 ms
+Speedup C(lists) vs Python: 5.4x
+Speedup C(numpy) vs Python: 101.6x
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'python3 -c "\nimport time\nimport random\nrandom.seed(42)\nn = 5000\n\ncov = [[0.0] * n for _ in range(n)]\nfor i in range(n):\n    for j in range(i, n):\n        if i == j:\n            cov[i][j] = 0.01 + random.random() * 0.04\n        else:\n            cov[i][j] = cov[j][i] = random.random() * 0.001\n\nweights = [random.random() for _ in range(n)]\ntotal = sum(weights)\nweights = [w / total for w in weights]\n\nfrom portfolio_baseline import portfolio_risk_python\nfrom portfolio_optimized_c import portfolio_risk_c\n\n# Replicate benchmark timing\ndef time_func(func, *args, num_runs=3):\n    times = []\n    for _ in range(num_runs):\n        start = time.perf_counter()\n        result = func(*args)\n        end = time.perf_counter()\n        times.append(end - start)\n    return min(times), result\n\npy_time, py_risk = time_func(portfolio_risk_python, weights, cov)\nprint(f\'Python: {py_time*1000:.1f} ms\')\n\nc_time, c_risk = time_func(portfolio_risk_c, weights, cov)\nprint(f\'C: {c_time*1000:.1f} ms\')\nprint(f\'Speedup: {py_time/c_time:.1f}x\')\n"', 'timeout': 120})
+<< Python: 2308.8 ms
+C: 526.3 ms
+Speedup: 4.4x
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cat /app/portfolio_optimized.py'})
+<< """
+Python wrapper for portfolio optimization C extension.
+"""
+
+import numpy as np
+from portfolio_optimized_c import portfolio_risk_c as _portfolio_risk_c, portfolio_return_c as _portfolio_return_c
+
+def portfolio_risk_c(weights, cov_matrix):
+    weights = np.asarray(weights, dtype=np.float64)
+    cov_matrix = np.asarray(cov_matrix, dtype=np.float64)
+    return _portfolio_risk_c(weights, cov_matrix
+>> ShellSession({'command': 'python3 -c "\ncontent = \'\'\'\\"\\"\\"\nPython wrapper for portfolio optimization C extension.\n\\"\\"\\"\n\nfrom portfolio_optimized_c import portfolio_risk_c, portfolio_return_c\n\n__all__ = [\\"portfolio_risk_c\\", \\"portfolio_return_c\\"]\n\'\'\'\nwith open(\'/app/portfolio_optimized.py\', \'w\') as f:\n    f.write(content)\nprint(\'Written successfully\')\n"'})
+<< Written successfully
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+>> ShellSession({'command': 'cd /app && python3 benchmark.py 2>&1', 'timeout': 600})
+<< Portfolio Optimization Benchmark
+========================================
+
+Testing portfolio size: 5000 assets
+------------------------------
+Python baseline time: 2757.3 ms
+Risk - Python: 0.022532625110, C: 0.022532625110, diff: 1.39e-17
+Return - Python: 0.100448895074, C: 0.100448895074, diff: 5.55e-17
+Correctness test PASSED
+C optimized time: 478.1 ms
+Speedup: 5.8x
+Performance requirement met! 
+>> ShellSession({'command': 'cat /app/portfolio_optimized.c'})
+<< #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <Python.h>
+#include <numpy/arrayobject.h>
+#include <math.h>
+#include <stdlib.h>
+
+static double* extract_double_array(PyObject *obj, npy_intp *out_n, int *owned) {
+    PyArrayObject *arr;
+    if (PyArray_Check(obj)) {
+        arr = (PyArrayObject *)obj;
+        if (PyArray_TYPE(arr) != NPY_FLOAT64) {
+            PyArray_Descr *dtype = PyArr
+>> ShellSession({'command': 'cat /app/portfolio_optimized.py'})
+<< """
+Python wrapper for portfolio optimization C extension.
+"""
+
+from portfolio_optimized_c import portfolio_risk_c, portfolio_return_c
+
+__all__ = ["portfolio_risk_c", "portfolio_return_c"]
+[exit=0 cwd=/app timed_out=false backend=harbor-env]
+
+=== pi notifications (3) ===
+[info] little-coder scaffold loaded
+[info] knowledge-inject: +1 [Workspace Documentation]
+[info] finalize-warn: 5 turns left at 36/40
