@@ -2,28 +2,25 @@
 
 ## Setup
 
-Extension setting: full little-coder extension set.
+Extension setting: full little-coder extension set (all 20 extensions enabled).
 
 Model:
-- `umich/qwen/qwen3.6-35b-a3b`
+* `umich/qwen/qwen3.6-35b-a3b`
 
 Dataset:
-- `terminal-bench@2.0`
+* `terminal-bench@2.0`
 
 Agent:
-- `benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent`
+* `benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent`
 
 Command:
-
-```bash
-harbor run \
-  --dataset terminal-bench@2.0 \
-  --agent-import-path benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent \
-  --model umich/qwen/qwen3.6-35b-a3b \
-  --jobs-dir benchmarks/harbor_runs/ablation_all_on \
-  --n-concurrent 7 \
-  --n-attempts 5
-
+harbor run 
+--dataset terminal-bench@2.0 
+--agent-import-path benchmarks.harbor_adapter.little_coder_agent:LittleCoderAgent 
+--model umich/qwen/qwen3.6-35b-a3b 
+--jobs-dir benchmarks/harbor_runs/ablation_all_on 
+--n-concurrent 7 
+--n-attempts 5
 ## Harbor Output Summary
 
 - Total attempted: 445 / 445
@@ -57,7 +54,7 @@ For the scored reward outcomes only:
 - Number of scored trials: `n = 205`
 - Number of successful scored trials: `42`
 - Scored reward mean: `42 / 205 = 0.2049`
-- Sample variance of scored binary rewards: `0.1638`
+- Sample variance of scored binary rewards: `0.1628`
 - Standard error of scored reward mean: `0.0282`
 
 Note: Harbor's reported `Mean = 0.094` uses the full benchmark accounting with exceptions counted as errors. The variance estimate above is computed only from the 205 scored reward outcomes.
@@ -65,7 +62,6 @@ Note: Harbor's reported `Mean = 0.094` uses the full benchmark accounting with e
 ## Raw Result
 
 Local raw result path:
-
 ```text
 benchmarks/harbor_runs/ablation_all_on/2026-05-19__23-56-30/result.json
 ```
