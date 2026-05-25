@@ -38,9 +38,6 @@ This suggests that removing these 4 extensions causes the agent to run significa
 
 Pass rate (93.6%) is slightly higher than all-off (91.4%), suggesting these 4 extensions do not contribute positively to performance and may even slightly hurt it.
 
-## Next Step
-
-Binary search: remove only shell-session and checkpoint (keep tool-gating and permission-gate) to narrow down which subset is responsible for the long-runtime behavior.
 
 ## Raw Result
 
