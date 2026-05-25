@@ -31,8 +31,8 @@ Dataset:
 ## Analysis
 
 Compared to minus4 (shell-session + checkpoint + tool-gating + permission-gate removed):
-- `ledger` and `sgf-parsing` returned to normal runtimes (~22s and ~40s) — confirming shell-session was responsible for their long runtimes in minus4.
-- However, new long runtimes appeared: `bowling` (113.7s), `alphametics` (75.0s) — indicating checkpoint also contributes to runaway behavior.
+- `ledger` and `sgf-parsing` returned to normal runtimes (~22s and ~40s), which confirmes shell-session was responsible for their long runtimes in minus4.
+- However, new long runtimes appeared: `bowling` (113.7s), `alphametics` (75.0s), which indicates that checkpoint also contributes to runaway behavior.
 
 Conclusion: both shell-session and checkpoint cause long-running/timeout behavior. Removing either one alone may be insufficient, which suggests that both should be removed to fully resolve the issue.
 
