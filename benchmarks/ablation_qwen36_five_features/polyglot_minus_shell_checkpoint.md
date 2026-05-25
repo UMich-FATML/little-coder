@@ -34,7 +34,7 @@ Compared to minus4 (which removed shell-session, checkpoint, tool-gating, permis
 - `ledger`: back to 22.2s (was 148.3s in minus4)
 - `sgf-parsing`: back to 40.3s (was 146.1s in minus4)
 
-This confirms that the long-runtime behavior was **probably(up to now)** caused by **shell-session or checkpoint** (not tool-gating or permission-gate **?**). The next step is to isolate which of the two is responsible by removing only shell-session.
+This confirms that the long-runtime behavior was **probably(up to now)** caused by **shell-session or checkpoint** (not tool-gating or permission-gate). The next step is to isolate which of the two is responsible by removing only shell-session.
 
 ## Raw Result
 
