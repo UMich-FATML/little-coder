@@ -40,10 +40,6 @@ shell-session increases per-tool-call latency (managing tmux/subprocess state), 
 
 **In short**: checkpoint's retry timing does not account for pi's processing state — this is a race condition that only manifests when the guarding extensions (permission-gate, tool-gating) are absent.
 
-## Prediction vs Actual
-
-Predicted: ~94-95%. Actual: 95.7% — consistent with prediction.
-
 ## Raw Result
 
 ```text
