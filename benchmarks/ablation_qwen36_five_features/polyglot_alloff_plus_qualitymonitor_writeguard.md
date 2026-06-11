@@ -22,23 +22,13 @@ Dataset:
 
 ## Analysis
 
-Pass rate is 95.7% (134/140). This is the v({Q, W}) coalition for the two-player
-Shapley game with quality-monitor (Q) and write-guard (W).
-
-Key comparison against other coalitions:
-
-| Coalition       | Pass | Rate  |
-|-----------------|------|-------|
-| ∅ (all-off)     | 128  | 91.4% |
-| {W}             | 135  | 96.4% |
-| {Q, W}          | 134  | 95.7% |
-| {Q}             | 138  | 98.6% |
-
-v({Q, W}) = 95.7% is **lower** than v({Q}) = 98.6%, indicating a strong negative
-interaction between quality-monitor and write-guard: adding write-guard on top of
-quality-monitor reduces pass rate by 2.9pp. The interaction effect is:
+Pass rate is 95.7% (134/140). The interaction effect between Q and W is:
 
 γ_QW = v({Q,W}) − v({Q}) − v({W}) + v(∅) = 95.7 − 98.6 − 96.4 + 91.4 = −7.9pp
+
+Strong negative interaction: adding write-guard on top of quality-monitor reduces
+pass rate by 2.9pp (98.6% → 95.7%). The two features interfere with each other
+on Polyglot tasks.
 
 ## Raw Result
 ```text
