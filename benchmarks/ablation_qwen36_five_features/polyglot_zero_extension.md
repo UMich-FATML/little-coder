@@ -22,10 +22,10 @@ Dataset:
 
 ## Analysis
 
-Pass rate is 95.0% (133/140), which is **higher** than all-off baseline (128/140 = 91.4%).
-This demonstrates that the 14 scaffold extensions in all-off have a net negative effect
-of −3.6pp on Aider Polyglot pass rate. The scaffold adds context complexity and tool
-overhead that hinders the agent on short, self-contained coding tasks.
+Pass rate is 95.0% (133/140), **higher** than all-off baseline (128/140 = 91.4%).
+The 14 scaffold extensions in all-off have a net negative effect of −3.6pp on Aider
+Polyglot pass rate. The scaffold adds context complexity and tool overhead that
+hinders the agent on short, self-contained coding tasks.
 
 This also confirms that Aider Polyglot cannot detect timeout behavior: even with no
 extensions, the agent completes all tasks without any AgentTimeoutError.
