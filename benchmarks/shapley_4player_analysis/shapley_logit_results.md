@@ -63,10 +63,3 @@ pairwise and higher-order interactions.
 All 6 pairwise interactions are negative on both scales. No feature pair
 exhibits synergy. The logit scale makes the interactions more interpretable
 as log-odds ratios.
-
-## Key Conclusion
-
-Using logit scale does not resolve the negative Shapley values — they are
-slightly more pronounced. The negative φ for OP and KS reflects their net
-negative average marginal contribution across all coalition contexts, driven
-by the strong pairwise interference effects.
