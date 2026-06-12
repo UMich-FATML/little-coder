@@ -57,10 +57,10 @@ Additive model explains only 45% of variance; interactions account for an additi
 
 ## Key Findings
 
-1. Q alone (98.6%) outperforms the grand coalition (95.7%) — more features != better.
-2. Q accounts for ~100% of the Shapley-attributed gain; all other features are near zero or negative on logit scale.
-3. All pairwise interactions are negative, strongest is Q x W (-7.9pp).
-4. The additive model is a poor fit (R-squared = 0.45 on both raw and logit scales), confirming non-additivity is structural.
+1. Quality-monitor alone (98.6%) outperforms the grand coalition (95.7%) — more features != better.
+2. Quality-monitor accounts for ~100% of the Shapley-attributed gain, while all other features are near zero or negative on logit scale.
+3. All pairwise interactions are negative, among them, the strongest one is Q x W (-7.9pp).
+4. The additive model is a poor fit (R-squared = 0.45 on both raw and logit scales)!:(
 
 ## Files
 
