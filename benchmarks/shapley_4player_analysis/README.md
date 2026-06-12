@@ -55,19 +55,9 @@ All 6 pairs are negative (no synergy observed):
 
 Additive model explains only 45% of variance; interactions account for an additional 25%.
 
-## Key Findings
+## Summary
 
-1. Quality-monitor alone (98.6%) outperforms the grand coalition (95.7%) — more features != better.
+1. Quality-monitor alone (98.6%) outperforms the grand coalition (95.7%), which shows that more features doesn't guarantee a better performance.
 2. Quality-monitor accounts for ~100% of the Shapley-attributed gain, while all other features are near zero or negative on logit scale.
 3. All pairwise interactions are negative, among them, the strongest one is Q x W (-7.9pp).
 4. The additive model is a poor fit (R-squared = 0.45 on both raw and logit scales)!:(
-
-## Files
-
-- `shapley_exact_model.py` — Exact Shapley computation + linear regression models
-- `shapley_exact_figures.py` — Generates 4 publication figures
-- `shapley_exact_results.json` — Machine-readable results
-- `fig1_exact_shapley.png` — Singleton vs exact Shapley bar chart
-- `fig2_exact_interactions.png` — Complete pairwise interaction heatmap
-- `fig3_exact_coalition_landscape.png` — All 16 coalitions ranked by pass rate
-- `fig4_shapley_waterfall.png` — Waterfall decomposition from baseline to grand coalition
