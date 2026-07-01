@@ -4,7 +4,7 @@
 
 - **Benchmark**: Aider Polyglot, 140 Python tasks
 - **Models**: Qwen3.6-35B-A3B, Gemma-4-26B-A4B-IT (via vLLM)
-- **Players (11)**: Q (quality-monitor), W (write-guard), OP (output-parser), KS (knowledge+skill-inject), TB (thinking-budget), CP (checkpoint), SS (shell-session), BR (browser), ET (extra-tools), EV (evidence+evidence-compact+browser-extract-retention), INFRA (permission-gate, tool-gating, turn-cap, benchmark-profiles, hello, finalize-warn)
+- **Players (11)**: Q (quality-monitor), W (write-guard), OP (output-parser), KS (knowledge-inject + skill-inject), TB (thinking-budget), CP (checkpoint), SS (shell-session), BR (browser), ET (extra-tools), EV (evidence + evidence-compact + browser-extract-retention), INFRA (permission-gate, tool-gating, turn-cap, benchmark-profiles, hello, finalize-warn)
 - **Substrate (always-on)**: llama-cpp-provider
 - **Coalitions**: 46 per model (34 INFRA-on + 12 INFRA-off)
 - **Scale**: logit (log-odds of pass rate)
