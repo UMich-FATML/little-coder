@@ -68,12 +68,6 @@
 
 Cross-model regression (92 obs = 46 configs x 2 models):
 
-| Model | Params | R2 | RMSE |
-|-------|--------|-----|------|
-| (A) mu_i + beta_j (additive) | 47 | 0.862 | 0.232 |
-| (B) mu_i + lambda * u_i^T v_j (bilinear) | 47 | 0.458 | 0.461 |
-| (C) saturated | 92 | 1.000 | 0.000 |
-
 
 
 ## Files
