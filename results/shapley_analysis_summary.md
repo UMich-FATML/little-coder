@@ -54,7 +54,7 @@
 | SS | +0.249 | -0.193 | +0.441 | Sign reversal |
 | INFRA | +0.211 | -0.221 | +0.432 | Sign reversal |
 | W | +0.030 | -0.289 | +0.319 | Sign reversal |
-| TB | -0.805 | +0.038 | -0.842 | Sign reversal (TB race-condition affects Qwen more) |
+| TB | -0.805 | +0.038 | -0.842 | Sign reversal (TB issue: rerun needed) |
 | Q | +0.051 | +0.180 | -0.129 | Both positive, Gemma relies more on Q |
 | BR | +0.075 | +0.119 | -0.045 | Both positive, consistent |
 
