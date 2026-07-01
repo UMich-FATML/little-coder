@@ -74,9 +74,7 @@ Cross-model regression (92 obs = 46 configs x 2 models):
 | (B) mu_i + lambda * u_i^T v_j (bilinear) | 47 | 0.458 | 0.461 |
 | (C) saturated | 92 | 1.000 | 0.000 |
 
-- lambda = 1.19 (close to 1, scale is correct)
-- Bilinear R2 < additive R2: Shapley vectors alone do not fully predict cross-model variation; estimation noise in v_j is amplified across models
-- Key finding: the Shapley rankings are highly model-dependent (multiple sign reversals), confirming that feature value is not model-agnostic — the same extension can help one model and hurt another
+
 
 ## Files
 
