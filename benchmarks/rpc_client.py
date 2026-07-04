@@ -260,11 +260,13 @@ class PiRpc:
                 self._cv.wait(timeout=remaining)
 
     # ── Public API ───────────────────────────────────────────────────────
-    def prompt_and_collect(self, message: str, timeout: float = 900) -> PromptResult:
+    def prompt_and_collect(self, message: str, timeout: float = 900,
+                           streaming_behavior: str = "followUp") -> PromptResult:
         """Send a prompt, drain events until agent_end, return summary."""
         rid = str(uuid.uuid4())
-        self._send({"id": rid, "type": "prompt", "message": message})
-        resp = self._await_response(rid, timeout=30)
+        self._send({"id": rid, "type": "prompt", "message": message,
+                   "streamingBehavior": streaming_behavior})
+        resp = self._await_response(rid, timeout=120)
         if not resp.get("success"):
             raise RuntimeError(f"pi rejected prompt: {resp.get('error')}")
 

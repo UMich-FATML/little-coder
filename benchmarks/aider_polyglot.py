@@ -221,11 +221,17 @@ def main():
         key = f"{args.language}/{name}"
         if args.resume and results["exercises"].get(key, {}).get("status") in ("pass_1", "pass_2"):
             continue
-        r = _run_exercise(
-            args.language, name, args.model,
-            verbose=args.verbose,
-            retry=not args.no_retry,
-        )
+        try:
+            r = _run_exercise(
+                args.language, name, args.model,
+                verbose=args.verbose,
+                retry=not args.no_retry,
+            )
+        except (RuntimeError, TimeoutError) as e:
+            msg = str(e)
+            status = "error" if "already processing" in msg else "fail"
+            print(f"[{args.language}/{name}] {status.upper()} (RuntimeError: {msg})")
+            r = {"status": status, "error": msg}
         results["exercises"][key] = r
         _save_results(results)
 
