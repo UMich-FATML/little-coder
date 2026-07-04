@@ -54,7 +54,7 @@
 | SS | +0.249 | -0.193 | +0.441 | Sign reversal |
 | INFRA | +0.211 | -0.221 | +0.432 | Sign reversal |
 | W | +0.030 | -0.289 | +0.319 | Sign reversal |
-| TB | -0.805 | +0.038 | -0.842 | Sign reversal (TB race-condition affects Qwen more) |
+| TB | -0.805 | +0.038 | -0.842 | Sign reversal (TB issue: rerun needed) |
 | Q | +0.051 | +0.180 | -0.129 | Both positive, Gemma relies more on Q |
 | BR | +0.075 | +0.119 | -0.045 | Both positive, consistent |
 
@@ -68,15 +68,7 @@
 
 Cross-model regression (92 obs = 46 configs x 2 models):
 
-| Model | Params | R2 | RMSE |
-|-------|--------|-----|------|
-| (A) mu_i + beta_j (additive) | 47 | 0.862 | 0.232 |
-| (B) mu_i + lambda * u_i^T v_j (bilinear) | 47 | 0.458 | 0.461 |
-| (C) saturated | 92 | 1.000 | 0.000 |
 
-- lambda = 1.19 (close to 1, scale is correct)
-- Bilinear R2 < additive R2: Shapley vectors alone do not fully predict cross-model variation; estimation noise in v_j is amplified across models
-- Key finding: the Shapley rankings are highly model-dependent (multiple sign reversals), confirming that feature value is not model-agnostic — the same extension can help one model and hurt another
 
 ## Files
 
