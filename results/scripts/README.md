@@ -42,6 +42,3 @@ reads the detail lines.
 - This driver covers only the 34 INFRA-on coalitions. The 12 INFRA-off ones
   (the 10 `noinfra_*`, `loo_INFRA`, `zero_ext`) were run separately with the
   same toggling logic, deleting the INFRA group as well.
-- Sanity check after a run: a coalition with a long run of identical ~8s
-  FAILs usually means the model dropped off the endpoint mid-run, not a real
-  result. Re-run that coalition.
