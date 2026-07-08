@@ -13,7 +13,19 @@ the same 140 tasks). Cross-model comparison uses a nested Wald test.
 - **Coalitions**: 46 per model (34 INFRA-on + 12 INFRA-off)
 - **Scale**: logit (empirical logit of pass rate)
 - **Estimation**: exact constrained WLS; 95% CIs from task bootstrap (2000 reps)
+- ## Inference (se and 95% CI)
 
+Standard errors and confidence intervals come from a task bootstrap. All 46
+coalitions are evaluated on the same 140 tasks, so their pass rates are
+correlated; the bootstrap resamples at the task level to respect this. In
+each of 2000 replicates we draw 140 tasks with replacement, recompute every
+coalition's pass rate on the resampled set, and rerun the full pipeline
+(empirical logit, then exact constrained WLS) to obtain one set of 11 Shapley
+values. The reported se is the standard deviation of a feature's 2000
+bootstrap values; the 95% CI is their 2.5th and 97.5th percentiles. A feature
+is marked significant (*) when its 95% CI excludes zero. Cross-model deltas
+(v_Qwen - v_Gemma) use the same resampled task set for both models in each
+replicate, so their CIs are computed jointly.
 ## KernelSHAP Shapley Values
 
 ### Qwen3.6-35B-A3B
