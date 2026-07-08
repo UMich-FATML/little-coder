@@ -2,8 +2,8 @@
 
 `results/scripts/run_ablation_interactive.sh` asks the operator to restart
 `little-coder --model <MODEL> --mode rpc` in a separate terminal before each
-coalition. **That process is never used by the benchmark.** (Verified
-2026-07-06 while automating the gemma 11-player ablation.)
+coalition. **That process is never used by the benchmark.** Verified
+2026-07-06 while automating the gemma 11-player ablation.
 
 ## Why
 
