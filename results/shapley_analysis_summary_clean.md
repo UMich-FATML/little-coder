@@ -1,6 +1,5 @@
-# 11-Player Shapley Ablation: Qwen & Gemma Results (Clean Rerun)
+# 11-Player Shapley Ablation: Qwen & Gemma Results 
 
-Clean rerun after fixing the "Agent is already processing" race condition.
 All 46 coalitions per model re-run under the corrected client with zero
 crashes. Shapley values use exact constrained WLS (KernelSHAP, Lagrange
 closed form); 95% CIs from task bootstrap (2000 reps, all coalitions share
