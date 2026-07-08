@@ -4,7 +4,8 @@ Clean rerun after fixing the "Agent is already processing" race condition.
 All 46 coalitions per model re-run under the corrected client with zero
 crashes. Shapley values use exact constrained WLS (KernelSHAP, Lagrange
 closed form); 95% CIs from task bootstrap (2000 reps, all coalitions share
-the same 140 tasks). Cross-model comparison uses a nested Wald test.
+the same 140 tasks). Cross-model comparison uses the saturated model of
+equation (3.1) and a nested Wald test.
 
 ## Setup
 - **Benchmark**: Aider Polyglot, 140 Python tasks
@@ -14,6 +15,19 @@ the same 140 tasks). Cross-model comparison uses a nested Wald test.
 - **Coalitions**: 46 per model (34 INFRA-on + 12 INFRA-off)
 - **Scale**: logit (empirical logit of pass rate)
 - **Estimation**: exact constrained WLS; 95% CIs from task bootstrap (2000 reps)
+
+## Inference (se and 95% CI)
+
+Standard errors and confidence intervals come from a task bootstrap. All 46
+coalitions are evaluated on the same 140 tasks, so their pass rates are
+correlated; the bootstrap resamples at the task level to respect this. In
+each of 2000 replicates we draw 140 tasks with replacement, recompute every
+coalition's pass rate on the resampled set, and rerun the full pipeline
+(empirical logit, then exact constrained WLS) to obtain one set of 11 Shapley
+values. The reported **se** is the standard deviation of a feature's 2000
+bootstrap values; the **95% CI** is their 2.5th and 97.5th percentiles. A
+feature is marked **sig** (`*`) when its 95% CI excludes zero, i.e. its effect
+is distinguishable from zero given sampling noise.
 
 ## KernelSHAP Shapley Values
 
@@ -57,10 +71,71 @@ the same 140 tasks). Cross-model comparison uses a nested Wald test.
 | 10 | INFRA | -0.315 | 0.093 | [-0.508, -0.150] | * |
 | 11 | W | -0.425 | 0.091 | [-0.618, -0.268] | * |
 
-## Cross-Model Comparison (model-agnostic test)
+## Saturated model and cross-model comparison
 
-Nested test: shared feature vector (Model 0) vs per-model vectors (Model 1).
-Joint Wald on delta = v_Qwen - v_Gemma.
+We plug the per-model Shapley vectors into the saturated model of equation
+(3.1),
+
+    g(E[Y_ij]) = mu + beta_j + u_i^T v_j,
+
+where the row index i is a coalition and the column index j is a model.
+Variable definitions:
+
+- **u_i** in {0,1}^11: the coalition indicator, 1 for each switched-on player.
+- **v_j** in R^11: model j's fitted Shapley vector (the tables above), read as
+  how much model j relies on each feature.
+- **u_i^T v_j** = sum of the Shapley values of the on-players; the per-model
+  additive reconstruction of coalition i's effect relative to that model's
+  empty coalition. This is the term that replaces the harness main effect plus
+  interaction (alpha_i + gamma_ij) of equation (3.1).
+- **beta_j**: model j's empty-coalition log-odds (the LLM main effect), kept
+  separate.
+- **vbar** = (v_Qwen + v_Gemma)/2: the shared feature vector. u_i^T vbar is the
+  harness main effect **alpha_i** (same across models).
+- **delta_j** = v_j - vbar: model j's departure from the shared vector.
+  u_i^T delta_j is the harness-LLM interaction **gamma_ij**. With two models
+  delta_Qwen = -delta_Gemma, so the two interactions are equal and opposite.
+
+Thus u_i^T v_j = u_i^T vbar + u_i^T delta_j = alpha_i + gamma_ij, the folding
+used in equation (3.1).
+
+### Decomposition u_i^T v_j = alpha_i + gamma_ij (log-odds)
+
+| Coalition | Model | alpha = u^T vbar | gamma = u^T delta_j | u^T v_j |
+|-----------|-------|------------------|---------------------|---------|
+| grand_all10 | Qwen | -0.341 | +0.342 | +0.001 |
+| grand_all10 | Gemma | -0.341 | -0.342 | -0.682 |
+| addone_W | Qwen | -0.175 | +0.566 | +0.391 |
+| addone_W | Gemma | -0.175 | -0.566 | -0.740 |
+| pair_Q_W | Qwen | -0.060 | +0.535 | +0.475 |
+| pair_Q_W | Gemma | -0.060 | -0.535 | -0.595 |
+
+The shared alpha is identical across models; the interaction gamma carries all
+the cross-model difference (equal and opposite here because J = 2).
+
+### Reconstruction: beta_j + u_i^T v_j vs observed coalition logit
+
+| Model | Coalition | u^T v_j | pred = beta_j + u^T v_j | observed |
+|-------|-----------|---------|-------------------------|----------|
+| Qwen | zero_ext | +0.000 | +2.520 | +2.520 |
+| Qwen | grand_all10 | +0.001 | +2.521 | +2.520 |
+| Qwen | addone_Q | +0.366 | +2.886 | +2.879 |
+| Qwen | addone_W | +0.391 | +2.911 | +2.520 |
+| Qwen | loo_W | -0.108 | +2.412 | +2.091 |
+| Gemma | zero_ext | +0.000 | +1.661 | +1.661 |
+| Gemma | grand_all10 | -0.682 | +0.979 | +0.979 |
+| Gemma | addone_W | -0.740 | +0.921 | +0.979 |
+| Gemma | loo_W | -0.257 | +1.404 | +1.715 |
+
+Empty and grand coalitions reconstruct exactly by the efficiency constraint.
+Intermediate coalitions carry residual (within-model feature interaction);
+reconstruction is tighter for Gemma (additive R2 = 0.78) than for Qwen
+(0.34), consistent with Qwen being at ceiling.
+
+### Is feature value model-agnostic? (nested Wald test)
+
+Nested test: shared feature vector (Model 0, v_j == vbar for all j) vs
+per-model vectors (Model 1). Joint Wald on delta = v_Qwen - v_Gemma.
 
 - Weighted RSS: Model 0 = 50.75, Model 1 = 32.93
 - chi2(11) = 40.93, p < 0.0001 (reject shared-vector model)
@@ -79,6 +154,10 @@ Joint Wald on delta = v_Qwen - v_Gemma.
 | SS | -0.005 | +0.016 | -0.021 | +0.037 | [-0.102, +0.194] |  |
 | ET | -0.028 | -0.018 | -0.026 | +0.008 | [-0.200, +0.270] |  |
 | CP | -0.051 | -0.063 | -0.059 | -0.004 | [-0.188, +0.178] |  |
+
+Note: vbar and v_Qwen/v_Gemma differ slightly between the decomposition tables
+(point estimates from the per-model fit) and this table (joint cross-model
+fit); both describe the same quantities.
 
 ## Files
 - `analyze_shapley_v2.py`: analysis script (constrained WLS, bootstrap CIs, nested test)
