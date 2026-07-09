@@ -87,12 +87,11 @@ Variable definitions:
   additive reconstruction of coalition i's effect relative to that model's
   empty coalition. This is the term that replaces the harness main effect plus
   interaction (alpha_i + gamma_ij) of equation (3.1).
-- **beta_j**: model j's empty-coalition log-odds (the LLM main effect), kept
-  separate.
+- **beta_j**: model j's empty-coalition log-odds.
 - **vbar** = (v_Qwen + v_Gemma)/2: the shared feature vector. u_i^T vbar is the
   harness main effect **alpha_i** (same across models).
 - **delta_j** = v_j - vbar: model j's departure from the shared vector.
-  u_i^T delta_j is the harness-LLM interaction **gamma_ij**. With two models
+  u_i^T delta_j is the harness-LLM interaction **gamma_ij**. Since currently, two models are tested, then we have
   delta_Qwen = -delta_Gemma, so the two interactions are equal and opposite.
 
 Thus u_i^T v_j = u_i^T vbar + u_i^T delta_j = alpha_i + gamma_ij, the folding
