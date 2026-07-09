@@ -112,6 +112,11 @@ The shared alpha is identical across models; the interaction gamma carries all
 the cross-model difference (equal and opposite here because J = 2).
 
 ### Reconstruction: beta_j + u_i^T v_j vs observed coalition logit
+
+For each coalition, **observed** is the empirical logit of the actual pass
+rate measured in the run, and **pred** = beta_j + u_i^T v_j is the model's
+reconstruction from the empty-coalition baseline plus the Shapley values of
+the on-players.
 Note: for Qwen, beta_j = +2.520; for Gemma, beta_j = +1.661.
 
 | Model | Coalition | u^T v_j | pred = beta_j + u^T v_j | observed |
