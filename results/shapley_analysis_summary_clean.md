@@ -135,33 +135,6 @@ Note: for Qwen, beta_j = +2.520; for Gemma, beta_j = +1.661.
 Empty and grand coalitions reconstruct exactly by the efficiency constraint.
 Intermediate coalitions carry residual (within-model feature interaction).
 
-### Is feature value model-agnostic? (nested Wald test)
-
-Nested test: shared feature vector (Model 0, v_j == vbar for all j) vs
-per-model vectors (Model 1). Joint Wald on delta = v_Qwen - v_Gemma.
-
-- Weighted RSS: Model 0 = 50.75, Model 1 = 32.93
-- chi2(11) = 40.93, p < 0.0001 (reject shared-vector model)
-- Only INFRA and W have a cross-model delta whose CI excludes zero
-
-| Player | vbar | v_Qwen | v_Gemma | delta | 95% CI (delta) | sig |
-|--------|------|--------|---------|-------|----------------|-----|
-| INFRA | -0.172 | +0.066 | -0.284 | +0.351 | [+0.176, +0.563] | * |
-| W | -0.264 | -0.021 | -0.351 | +0.331 | [+0.120, +0.538] | * |
-| KS | -0.045 | +0.063 | -0.089 | +0.152 | [-0.108, +0.383] |  |
-| Q | +0.223 | +0.345 | +0.195 | +0.149 | [-0.096, +0.348] |  |
-| TB | +0.013 | -0.090 | +0.057 | -0.147 | [-0.431, +0.142] |  |
-| EV | +0.035 | -0.060 | +0.074 | -0.135 | [-0.459, +0.122] |  |
-| BR | -0.005 | -0.050 | +0.008 | -0.059 | [-0.309, +0.199] |  |
-| OP | -0.018 | -0.050 | -0.012 | -0.038 | [-0.291, +0.229] |  |
-| SS | -0.005 | +0.016 | -0.021 | +0.037 | [-0.102, +0.194] |  |
-| ET | -0.028 | -0.018 | -0.026 | +0.008 | [-0.200, +0.270] |  |
-| CP | -0.051 | -0.063 | -0.059 | -0.004 | [-0.188, +0.178] |  |
-
-Note: vbar and v_Qwen/v_Gemma differ slightly between the decomposition tables
-(point estimates from the per-model fit) and this table (joint cross-model
-fit); both describe the same quantities.
-
 ## Files
 - `analyze_shapley_v2.py`: analysis script (constrained WLS, bootstrap CIs, nested test)
 - `uv_reconstruction.py`: saturated-model decomposition and reconstruction
