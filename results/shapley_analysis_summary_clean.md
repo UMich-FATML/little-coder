@@ -134,11 +134,6 @@ Note: for Qwen, beta_j = +2.520; for Gemma, beta_j = +1.661.
 
 Empty and grand coalitions reconstruct exactly by the efficiency constraint.
 Intermediate coalitions carry residual (within-model feature interaction).
-Fixed-phi reconstruction R2 over all 46 coalitions: Qwen -0.320, Gemma -0.137.
-This uses the locked KernelSHAP vector phi and is evaluated unweighted over
-every coalition, so it is lower than (and distinct from) the additive-model R2
-above, which refits free OLS coefficients. Reconstruction is tighter for Gemma
-than for Qwen, consistent with Qwen being at ceiling.
 
 ### Is feature value model-agnostic? (nested Wald test)
 
