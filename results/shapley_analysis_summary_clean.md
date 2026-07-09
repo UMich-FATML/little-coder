@@ -3,8 +3,7 @@
 All 46 coalitions per model re-run under the corrected client with zero
 crashes. Shapley values use exact constrained WLS (KernelSHAP, Lagrange
 closed form); 95% CIs from task bootstrap (2000 reps, all coalitions share
-the same 140 tasks). Cross-model comparison uses the saturated model of
-equation (3.1) and a nested Wald test.
+the same 140 tasks).
 
 ## Setup
 - **Benchmark**: Aider Polyglot, 140 Python tasks
