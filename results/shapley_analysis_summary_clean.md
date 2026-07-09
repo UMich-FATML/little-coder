@@ -17,7 +17,7 @@ equation (3.1) and a nested Wald test.
 
 ## Inference (se and 95% CI)
 
-Standard errors and confidence intervals come from a task bootstrap. All 46
+Standard errors and confidence intervals come from a bootstrap. All 46
 coalitions are evaluated on the same 140 tasks, so their pass rates are
 correlated; the bootstrap resamples at the task level to respect this. In
 each of 2000 replicates we draw 140 tasks with replacement, recompute every
