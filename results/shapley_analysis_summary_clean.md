@@ -103,12 +103,12 @@ used in equation (3.1).
 
 | Coalition | Model | alpha = u^T vbar | gamma = u^T delta_j | u^T v_j |
 |-----------|-------|------------------|---------------------|---------|
-| grand_all10 | Qwen | -0.341 | +0.342 | +0.001 |
-| grand_all10 | Gemma | -0.341 | -0.342 | -0.682 |
+| grand_all10 | Qwen | -0.341 | +0.341 | -0.000 |
+| grand_all10 | Gemma | -0.341 | -0.341 | -0.682 |
 | addone_W | Qwen | -0.175 | +0.566 | +0.391 |
 | addone_W | Gemma | -0.175 | -0.566 | -0.740 |
 | pair_Q_W | Qwen | -0.060 | +0.535 | +0.475 |
-| pair_Q_W | Gemma | -0.060 | -0.535 | -0.595 |
+| pair_Q_W | Gemma | -0.060 | -0.535 | -0.596 |
 
 The shared alpha is identical across models; the interaction gamma carries all
 the cross-model difference (equal and opposite here because J = 2).
@@ -118,19 +118,23 @@ the cross-model difference (equal and opposite here because J = 2).
 | Model | Coalition | u^T v_j | pred = beta_j + u^T v_j | observed |
 |-------|-----------|---------|-------------------------|----------|
 | Qwen | zero_ext | +0.000 | +2.520 | +2.520 |
-| Qwen | grand_all10 | +0.001 | +2.521 | +2.520 |
-| Qwen | addone_Q | +0.366 | +2.886 | +2.879 |
+| Qwen | grand_all10 | -0.000 | +2.520 | +2.520 |
+| Qwen | addone_Q | +0.366 | +2.886 | +3.030 |
 | Qwen | addone_W | +0.391 | +2.911 | +2.520 |
-| Qwen | loo_W | -0.108 | +2.412 | +2.091 |
+| Qwen | loo_W | -0.109 | +2.411 | +2.628 |
 | Gemma | zero_ext | +0.000 | +1.661 | +1.661 |
 | Gemma | grand_all10 | -0.682 | +0.979 | +0.979 |
-| Gemma | addone_W | -0.740 | +0.921 | +0.979 |
-| Gemma | loo_W | -0.257 | +1.404 | +1.715 |
+| Gemma | addone_Q | -0.170 | +1.491 | +1.771 |
+| Gemma | addone_W | -0.740 | +0.921 | +1.246 |
+| Gemma | loo_W | -0.257 | +1.405 | +1.715 |
 
 Empty and grand coalitions reconstruct exactly by the efficiency constraint.
-Intermediate coalitions carry residual (within-model feature interaction);
-reconstruction is tighter for Gemma (additive R2 = 0.78) than for Qwen
-(0.34), consistent with Qwen being at ceiling.
+Intermediate coalitions carry residual (within-model feature interaction).
+Fixed-phi reconstruction R2 over all 46 coalitions: Qwen -0.320, Gemma -0.137.
+This uses the locked KernelSHAP vector phi and is evaluated unweighted over
+every coalition, so it is lower than (and distinct from) the additive-model R2
+above, which refits free OLS coefficients. Reconstruction is tighter for Gemma
+than for Qwen, consistent with Qwen being at ceiling.
 
 ### Is feature value model-agnostic? (nested Wald test)
 
@@ -161,5 +165,6 @@ fit); both describe the same quantities.
 
 ## Files
 - `analyze_shapley_v2.py`: analysis script (constrained WLS, bootstrap CIs, nested test)
+- `uv_reconstruction.py`: saturated-model decomposition and reconstruction
 - `shapley_v2_results.json`: full numeric output
 - `ablation_qwen_11player/`, `ablation_gemma_11player/`: 46 per-task result files per model
