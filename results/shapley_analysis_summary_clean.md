@@ -1,4 +1,4 @@
-# 11-Player Shapley Ablation: Qwen & Gemma Results 
+# 11-Player Shapley: Qwen & Gemma Results 
 
 All 46 coalitions per model re-run under the corrected client with zero
 crashes. Shapley values use exact constrained WLS (KernelSHAP, Lagrange
