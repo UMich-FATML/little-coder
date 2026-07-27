@@ -41,8 +41,8 @@ values. The families, with their exact member sets (verified against
 INFRA split: 34 coalitions include INFRA; the 12 INFRA-off coalitions are
 `zero_ext`, the 10 `noinfra_X`, and `loo_INFRA`. Pairing coalitions with
 their complements follows the variance-reduction recommendations for
-KernelSHAP subsampling (Covert & Lee 2021; Olsen & Jullum 2024,
-arXiv:2410.04883).
+KernelSHAP subsampling.
+
 ## Inference (se and 95% CI)
 
 Standard errors and confidence intervals come from a bootstrap. All 46
@@ -98,32 +98,28 @@ is distinguishable from zero given sampling noise.
 | 10 | INFRA | -0.315 | 0.093 | [-0.508, -0.150] | * |
 | 11 | W | -0.425 | 0.091 | [-0.618, -0.268] | * |
 
-## Saturated model and cross-model comparison
-
-We plug the per-model Shapley vectors into the saturated model of equation
-(3.1),
-
-    g(E[Y_ij]) = mu + beta_j + u_i^T v_j,
-
-where the row index i is a coalition and the column index j is a model.
-Variable definitions:
-
+## Model
+ 
+With the empty coalition as the reference sub-harness, the working model is
+ 
+    g(E[Y_ij]) = beta_j + u_i^T v_j
+ 
+where beta_j is model j's empty-coalition log-odds (mu of equation (3.1) is
+absorbed into beta_j; there is no separate intercept). Variable definitions:
+ 
 - **u_i** in {0,1}^11: the coalition indicator, 1 for each switched-on player.
-- **v_j** in R^11: model j's fitted Shapley vector (the tables above), read as
-  how much model j relies on each feature.
-- **u_i^T v_j** = sum of the Shapley values of the on-players; the per-model
-  additive reconstruction of coalition i's effect relative to that model's
-  empty coalition. This is the term that replaces the harness main effect plus
-  interaction (alpha_i + gamma_ij) of equation (3.1).
-- **beta_j**: model j's empty-coalition log-odds.
-- **vbar** = (v_Qwen + v_Gemma)/2: the shared feature vector. u_i^T vbar is the
-  harness main effect **alpha_i** (same across models).
-- **delta_j** = v_j - vbar: model j's departure from the shared vector.
-  u_i^T delta_j is the harness-LLM interaction **gamma_ij**. Since currently, two models are tested, then we have
-  delta_Qwen = -delta_Gemma, so the two interactions are equal and opposite.
-
-Thus u_i^T v_j = u_i^T vbar + u_i^T delta_j = alpha_i + gamma_ij, the folding
-used in equation (3.1).
+- **v_j** in R^11: model j's fitted Shapley vector (tables below), the signed
+  additive contribution of each feature to model j's coalition logits.
+- **u_i^T v_j**: the per-model additive reconstruction of coalition i's
+  effect relative to model j's empty coalition. This is the feature-linear
+  surrogate for alpha_i + gamma_ij of equation (3.1).
+- **vbar** = (v_Qwen + v_Gemma)/2: the arithmetic mean of the per-model
+  Shapley vectors. u_i^T vbar is the harness main effect alpha_i.
+- **delta_j** = v_j - vbar: model j's departure. u_i^T delta_j is the
+  harness-LLM interaction gamma_ij, with sum_j delta_j = 0 by construction.
+  With J = 2 models, delta_Qwen = -delta_Gemma identically, so the two
+  interaction profiles are equal and opposite; the substantive question is
+  whether they are jointly zero (tested below).
 
 ### Decomposition u_i^T v_j = alpha_i + gamma_ij (log-odds)
 
