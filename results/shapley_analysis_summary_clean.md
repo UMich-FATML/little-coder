@@ -14,6 +14,35 @@ the same 140 tasks).
 - **Scale**: logit (empirical logit of pass rate)
 - **Estimation**: exact constrained WLS; 95% CIs from task bootstrap (2000 reps)
 
+## Coalition design (46 per model)
+ 
+The full game has 2^11 = 2048 coalitions. We evaluate a deterministic
+subsample of 46, so the fitted values are the kernel-weighted projection onto
+these configurations, not an unbiased estimate of the full-game Shapley
+values. The families, with their exact member sets (verified against
+`coalition_defs` in `analyze_shapley_v2.py`):
+ 
+- `zero_ext`: the empty coalition (no players on)
+- `baseline_empty`: {INFRA}. Naming caution: despite the name this is the
+  INFRA-only coalition, not the empty one; it plays the role of add-one for
+  INFRA.
+- `grand_all10`: all 11 players on. Naming caution: the `10` is a leftover
+  from the earlier design; the member set is the full 11-player grand
+  coalition.
+- `addone_X` (10): {X, INFRA} for each non-INFRA player X. The baseline is
+  INFRA-on, so under the additive reconstruction the coalition logit reflects
+  phi_X + phi_INFRA, not phi_X alone.
+- `noinfra_X` (10): {X} for each non-INFRA player X; the true singletons.
+- `loo_X` (11): grand minus player X.
+- `pair_X_Y` (6): {X, Y, INFRA} for (Q,W), (Q,CP), (Q,SS), (W,CP), (W,SS),
+  (CP,SS).
+- `lt2o_X_Y` (6): grand minus {X, Y} for the same six pairs (the pair
+  complements).
+INFRA split: 34 coalitions include INFRA; the 12 INFRA-off coalitions are
+`zero_ext`, the 10 `noinfra_X`, and `loo_INFRA`. Pairing coalitions with
+their complements follows the variance-reduction recommendations for
+KernelSHAP subsampling (Covert & Lee 2021; Olsen & Jullum 2024,
+arXiv:2410.04883).
 ## Inference (se and 95% CI)
 
 Standard errors and confidence intervals come from a bootstrap. All 46
