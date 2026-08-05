@@ -48,8 +48,7 @@ values. Both models use the same task resample within each replicate, so the
 draws of v_Qwen and v_Gemma are coupled and their difference can be tested
 directly. The reported **se** is the standard deviation of a feature's 2000
 bootstrap values; the **95% CI** is their 2.5th and 97.5th percentiles, i.e.
-**pointwise**, with no multiplicity correction. A feature is marked **sig**
-(`*`) when its pointwise 95% CI excludes zero.
+**pointwise**, with no multiplicity correction. 
 
 ## Endpoints
 
