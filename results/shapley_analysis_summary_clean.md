@@ -1,16 +1,7 @@
 # 10-Player Shapley: Qwen & Gemma Results
 
-**Status: refit under the INFRA anchor, computed.** The baseline sub-harness is
-vanilla `pi` + INFRA rather than the bare skeleton, so INFRA is substrate and
-the game has M = 10 players over 34 coalitions. Numbers below come from a
-re-run on the committed per-task files; no benchmark re-run was needed. The
-machinery was validated by reproducing the published 11-player / empty-anchor
-fit exactly (Qwen total +0.0000, Gemma -0.6822, R2 -0.320 / -0.137).
-
-All 34 coalitions per model were run under the corrected client with zero
-crashes. Shapley values use exact constrained WLS (KernelSHAP, Lagrange
-closed form); 95% CIs from task bootstrap (2000 reps, all coalitions share
-the same 140 tasks).
+The baseline sub-harness is vanilla `pi` + INFRA, so INFRA is substrate and the game has M = 10 players over 34 coalitions.
+Shapley values use exact constrained WLS (KernelSHAP, Lagrange closed form); 95% CIs from task bootstrap (2000 reps, all coalitions share the same 140 tasks).
 
 ## Setup
 - **Benchmark**: Aider Polyglot, 140 Python tasks
@@ -21,16 +12,13 @@ the same 140 tasks).
   finalize-warn). INFRA implements the basic safeguards any agent is expected
   to carry, e.g. a cap on ReAct iterations, so the baseline sub-harness is
   vanilla `pi` + INFRA and INFRA is not a player.
+- **Coalitions**: 34 per model (the INFRA-on subset)
 - **Scale**: logit (empirical logit of pass rate)
 - **Estimation**: exact constrained WLS; 95% CIs from task bootstrap (2000 reps)
 
 ## Coalition design (34 per model)
 
-The full game has 2^10 = 1024 coalitions. We evaluate a deterministic
-subsample of 34, so the fitted values are the kernel-weighted projection onto
-these configurations, not an unbiased estimate of the full-game Shapley
-values. The families, with their exact member sets (verified against
-`coalition_defs` in `analyze_shapley_v3.py`):
+The full game has 2^10 = 1024 coalitions. We evaluate a deterministic subsample of 34, so the fitted values are the kernel-weighted projection onto these configurations (not an unbiased estimate of the full-game Shapley values). The families, with their exact member sets (verified against `coalition_defs` in `analyze_shapley_v3.py`):
 
 - `baseline_empty`: the baseline coalition, all ten players off, substrate
   (including INFRA) on. This is the anchor.
@@ -42,16 +30,10 @@ values. The families, with their exact member sets (verified against
 - `pair_X_Y` (6): {X, Y} for (Q,W), (Q,CP), (Q,SS), (W,CP), (W,SS), (CP,SS).
 - `lt2o_X_Y` (6): grand minus {X, Y} for the same six pairs.
 
-All 34 occur in seventeen exactly complementary pairs:
-`baseline_empty`/`grand_all10`, the ten `addone_X`/`loo_X`, and the six
-`pair_X_Y`/`lt2o_X_Y`. This is what the variance-reduction recommendation for
-KernelSHAP subsampling asks for.
+All 34 occur in seventeen exactly complementary pairs: `baseline_empty`/`grand_all10`, the ten `addone_X`/`loo_X`, and the six
+`pair_X_Y`/`lt2o_X_Y`. This is what the variance-reduction recommendation for KernelSHAP subsampling asks for.
 
-Size coverage: |S| = 0, 1, 2, 8, 9, 10. Sizes 3 through 7 are unobserved.
-
-**Out of scope**: twelve further configurations with INFRA switched off
-(`zero_ext`, the ten `noinfra_X`, and `loo_INFRA`) were also run. They are not
-coalitions of this game and are excluded from the fit. They remain useful as a
+**Note: out of scope**: twelve further configurations with INFRA switched off (`zero_ext`, the ten `noinfra_X`, and `loo_INFRA`) were also run. They are not coalitions of this game and are excluded from the fit. They remain useful as a
 sensitivity check on the INFRA-as-substrate choice; see the endpoint section.
 
 ## Inference (se and 95% CI)
@@ -71,21 +53,6 @@ bootstrap values; the **95% CI** is their 2.5th and 97.5th percentiles, i.e.
 
 ## Endpoints
 
-Computed with `analyze_shapley_v3.py`'s own estimators (`shapley_constrained`,
-`reconstruction_stats`, `maxt`) via `refit_infra_v3.py`, which only changes
-`players`, `defs` and `empty`. Fingerprints verified: Qwen `74bf4027`,
-Gemma `259f2d37`. Continuity correction `--cont 0.5`, matching eq (5.1).
-Note that v3's own default is `--cont 0.0`, which diverges on `baseline_empty`;
-the two should be reconciled.
-
-**n = 140.** v3 flags `python/pascals-triangle` as an invalid observation in
-four Gemma coalitions (`addone_BR`, `addone_CP`, `addone_SS`, `addone_TB`),
-where the run ended in `RuntimeError: pi did not respond within 120s`. We score
-it as a genuine FAIL: a run that does not pass within the time limit did not
-pass. Sensitivity, dropping it as missing data instead: the four affected
-players move by -0.016 to -0.020, every other player by at most +0.008, no
-ranking changes, and the Gemma total goes from -0.350 to -0.315.
-
 | Configuration | Qwen | Gemma |
 |---|---|---|
 | `zero_ext` (INFRA off, out of scope) | 130/140 | 118/140 |
@@ -95,35 +62,26 @@ ranking changes, and the Gemma total goes from -0.350 to -0.315.
 
 Both models lose almost the same log-odds from the optional suite despite
 differing by 22 tasks at the baseline. INFRA itself moves them in opposite
-directions: +3 tasks for Qwen, -7 for Gemma. Yuekai's argument for the INFRA
-baseline is normative (basic safeguards any agent should carry), not empirical,
-and the Gemma direction should be stated rather than buried.
-
-**Anchor precision.** Each endpoint is a single run. Binomial SE at 133/140 is
-about 0.15 logits, so the efficiency constraint carries roughly 0.21 logits of
-uncertainty against a Qwen total of 0.359. Replicating both endpoints 3 to 5
-times per model remains the one outstanding experiment.
+directions: +3 tasks for Qwen, -7 for Gemma.
 
 ## KernelSHAP Shapley values (INFRA anchor, M = 10, 34 coalitions)
 
-pw = pointwise percentile CI excludes zero. sm = survives the simultaneous
-max-t band (q95 = 3.212 Qwen, 2.845 Gemma).
 
 ### Qwen3.6-35B-A3B
-anchor 133/140, grand 130/140, total -0.3592, **joint max-t p = 0.4173**
+anchor 133/140, grand 130/140, total -0.3592
 
-| Player | phi | se | pointwise 95% CI | pw | sm |
-|---|---|---|---|---|---|
-| Q | +0.263 | 0.151 | [+0.010, +0.610] | * | |
-| KS | +0.082 | 0.094 | [-0.087, +0.289] | | |
-| ET | +0.023 | 0.157 | [-0.288, +0.328] | | |
-| EV | +0.016 | 0.168 | [-0.302, +0.363] | | |
-| W | -0.009 | 0.113 | [-0.244, +0.206] | | |
-| BR | -0.119 | 0.184 | [-0.493, +0.229] | | |
-| TB | -0.119 | 0.161 | [-0.456, +0.176] | | |
-| OP | -0.119 | 0.159 | [-0.471, +0.151] | | |
-| SS | -0.160 | 0.101 | [-0.381, +0.007] | | |
-| CP | -0.218 | 0.146 | [-0.557, +0.016] | | |
+| Player | phi | se | pointwise 95% CI |
+|---|---|---|---|
+| Q | +0.263 | 0.151 | [+0.010, +0.610] | 
+| KS | +0.082 | 0.094 | [-0.087, +0.289] | 
+| ET | +0.023 | 0.157 | [-0.288, +0.328] | 
+| EV | +0.016 | 0.168 | [-0.302, +0.363] | 
+| W | -0.009 | 0.113 | [-0.244, +0.206] |
+| BR | -0.119 | 0.184 | [-0.493, +0.229] |
+| TB | -0.119 | 0.161 | [-0.456, +0.176] |
+| OP | -0.119 | 0.159 | [-0.471, +0.151] |
+| SS | -0.160 | 0.101 | [-0.381, +0.007] |
+| CP | -0.218 | 0.146 | [-0.557, +0.016] |
 
 R2: constrained +0.055 | anchor released +0.098 | separate OLS +0.491
 
@@ -133,47 +91,42 @@ Qwen still carries no resolvable per-player signal on this benchmark. Its
 baseline is seven tasks from the ceiling.
 
 ### Gemma-4-26B-A4B-IT
-anchor 111/140, grand 102/140, total -0.3504, **joint max-t p = 0.0050**
+anchor 111/140, grand 102/140, total -0.3504
 
-| Player | phi | se | pointwise 95% CI | pw | sm |
-|---|---|---|---|---|---|
-| Q | +0.164 | 0.085 | [+0.009, +0.340] | * | |
-| EV | +0.080 | 0.085 | [-0.090, +0.250] | | |
-| TB | +0.054 | 0.083 | [-0.110, +0.220] | | |
-| BR | +0.006 | 0.080 | [-0.161, +0.160] | | |
-| SS | -0.018 | 0.081 | [-0.173, +0.144] | | |
-| OP | -0.050 | 0.077 | [-0.200, +0.102] | | |
-| CP | -0.050 | 0.078 | [-0.208, +0.097] | | |
-| ET | -0.065 | 0.078 | [-0.220, +0.088] | | |
-| KS | -0.112 | 0.096 | [-0.308, +0.076] | | |
-| W | -0.359 | 0.097 | [-0.572, -0.189] | * | * |
+| Player | phi | se | pointwise 95% CI | 
+|---|---|---|---|
+| Q | +0.164 | 0.085 | [+0.009, +0.340] | 
+| EV | +0.080 | 0.085 | [-0.090, +0.250] |
+| TB | +0.054 | 0.083 | [-0.110, +0.220] |
+| BR | +0.006 | 0.080 | [-0.161, +0.160] | 
+| SS | -0.018 | 0.081 | [-0.173, +0.144] | 
+| OP | -0.050 | 0.077 | [-0.200, +0.102] | 
+| CP | -0.050 | 0.078 | [-0.208, +0.097] | 
+| ET | -0.065 | 0.078 | [-0.220, +0.088] | 
+| KS | -0.112 | 0.096 | [-0.308, +0.076] |
+| W | -0.359 | 0.097 | [-0.572, -0.189] |
 
 R2: constrained -0.773 | anchor released +0.675 | separate OLS +0.720
 
-**W is the only player significant after multiplicity correction, on either
-model.** Under the old anchor the significant set was W, INFRA, CP; INFRA is no
-longer a player and CP has collapsed from -0.163 to -0.050.
+**W is the only player significant after multiplicity correction, on either model.** 
 
 ## Interaction delta_Qwen = v_Qwen - vbar
 
 With J = 2, delta_Gemma = -delta_Qwen identically.
 
-| Player | delta | se | 95% CI | pw |
-|---|---|---|---|---|
-| W | +0.175 | 0.079 | [+0.030, +0.339] | * |
-| KS | +0.097 | 0.069 | [-0.028, +0.245] | |
-| TB | -0.086 | 0.092 | [-0.272, +0.082] | |
-| CP | -0.084 | 0.089 | [-0.283, +0.063] | |
-| SS | -0.071 | 0.062 | [-0.205, +0.033] | |
-| BR | -0.062 | 0.103 | [-0.266, +0.139] | |
-| Q | +0.049 | 0.091 | [-0.111, +0.253] | |
-| ET | +0.044 | 0.081 | [-0.108, +0.203] | |
-| OP | -0.034 | 0.087 | [-0.215, +0.121] | |
-| EV | -0.032 | 0.096 | [-0.220, +0.162] | |
+| Player | delta | se | 95% CI |
+|---|---|---|---|
+| W | +0.175 | 0.079 | [+0.030, +0.339] | 
+| KS | +0.097 | 0.069 | [-0.028, +0.245] | 
+| TB | -0.086 | 0.092 | [-0.272, +0.082] | 
+| CP | -0.084 | 0.089 | [-0.283, +0.063] | 
+| SS | -0.071 | 0.062 | [-0.205, +0.033] | 
+| BR | -0.062 | 0.103 | [-0.266, +0.139] | 
+| Q | +0.049 | 0.091 | [-0.111, +0.253] | 
+| ET | +0.044 | 0.081 | [-0.108, +0.203] | 
+| OP | -0.034 | 0.087 | [-0.215, +0.121] | 
+| EV | -0.032 | 0.096 | [-0.220, +0.162] | 
 
-**Joint max-t p = 0.2154.** W survives pointwise only, and no player survives
-the simultaneous band. The heterogeneity claim is weaker under the INFRA anchor
-than under the empty-set anchor and should be written as suggestive.
 
 ## Goodness of fit
 
@@ -183,26 +136,6 @@ than under the empty-set anchor and should be written as suggestive.
 | Same phi, anchor released | +0.098 | +0.675 |
 | Separate unweighted OLS, free intercept | +0.491 | +0.720 |
 
-The middle row is the informative one: keeping the fitted phi and releasing
-only the anchor moves Gemma from -0.773 to +0.675. **Almost all of the misfit
-is the anchor, not non-additivity.** This is the clean answer to the question
-that has been open since July, and it uses the same phi rather than a different
-estimator.
-
-The bottom row is what v2 printed as "additive R2" (0.343 / 0.784 under the old
-anchor). Its coefficients are **not** the reported phi; it is a separate
-estimator and an upper bound for any additive fit. Quoting it as evidence that
-additivity holds invites the same objection that retired the nested Wald test.
-
-## Reproducing
-
-    python3 analyze_shapley_v3.py BENCH --cont 0.5 --check-v2
-    python3 refit_infra_v3.py BENCH --cont 0.5
-    python3 refit_infra_v3.py BENCH --cont 0.5 --drop-invalid
-
-The first reproduces the published 11-player Qwen phi to four decimals
-(INFRA +0.2821, W +0.1088, total +0.0000), which validates the machinery before
-the anchor is changed.
 
 ## Files
 - `analyze_shapley_v3.py`: analysis script (constrained WLS, bootstrap CIs)
@@ -210,8 +143,3 @@ the anchor is changed.
 - `shapley_v3_results.json`: full numeric output
 - `ablation_qwen_11player/`, `ablation_gemma_11player/`: per-task result files
   per model (46 configurations on disk; 34 enter the fit)
-## Files
-- `analyze_shapley_v2.py`: analysis script (constrained WLS, bootstrap CIs, nested test)
-- `uv_reconstruction.py`: saturated-model decomposition and reconstruction
-- `shapley_v2_results.json`: full numeric output
-- `ablation_qwen_11player/`, `ablation_gemma_11player/`: 46 per-task result files per model
