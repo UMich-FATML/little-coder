@@ -107,8 +107,6 @@ anchor 111/140, grand 102/140, total -0.3504
 
 R2: constrained -0.773 | anchor released +0.675 | separate OLS +0.720
 
-**W is the only player significant after multiplicity correction, on either model.** 
-
 ## Interaction delta_Qwen = v_Qwen - vbar
 
 With J = 2, delta_Gemma = -delta_Qwen identically.
