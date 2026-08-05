@@ -62,7 +62,6 @@ is distinguishable from zero given sampling noise.
 - v(empty) = 130/140 = 92.9%, v(grand) = 130/140 = 92.9%
 - Total: +0.000 logits
 - Additive R2 (coalition logits): 0.343
-- No feature's 95% CI excludes zero (at ceiling; effects indistinguishable from noise)
 
 | Rank | Player | phi (logit) | se | 95% CI | sig |
 |------|--------|-------------|------|----------------|-----|
@@ -158,6 +157,23 @@ Note: for Qwen, beta_j = +2.520; for Gemma, beta_j = +1.661.
 
 Empty and grand coalitions reconstruct exactly by the efficiency constraint.
 Intermediate coalitions carry residual (within-model feature interaction).
+
+## Goodness of fit (two different fits)
+
+|  | Qwen | Gemma |
+|---|---|---|
+| Unconstrained additive WLS (free intercept, no efficiency constraint) | 0.343 | 0.784 |
+| Constrained fit — the phi reported above | −0.320 | −0.137 |
+| Gap = cost of the two constraints in eq (5.3) | 0.663 | 0.921 |
+
+The reported phi come from the constrained fit. The negative R2 is mechanical:
+phi_0 is pinned at v(empty) = 1.661 (Gemma) while the 46 coalition logits average
+about 1.45, so every prediction is high by roughly that offset; a free intercept
+absorbs exactly this shift. Anchor binomial SE 0.23 (Gemma) / 0.32 (Qwen) vs
+coalition spread 0.268 / 0.294. Caveat: binomial SE describes a fresh draw of
+tasks, but all 46 coalitions share the same 140 tasks and a common shift does not
+enter R2, so the anchor is one contributor, not established as the main one.
+
 
 ## Files
 - `analyze_shapley_v2.py`: analysis script (constrained WLS, bootstrap CIs, nested test)
