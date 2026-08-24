@@ -76,6 +76,47 @@ anchor 111/140, grand 102/140, total -0.3504
 | KS | -0.112 | 0.096 | [-0.308, +0.076] |
 | W | -0.359 | 0.097 | [-0.572, -0.189] |
 
+## Bilinear decomposition u_i^T v_j
+ 
+This is the quantity that replaces alpha_i + gamma_ij in the saturated model. For each coalition i, u_i is the 0/1 indicator of the switched-on players and v_j is the model's fitted feature vector above. vbar is the two-model average and delta_Qwen = v_Qwen - vbar, so u_i^T vbar plays the role of the harness main effect and u_i^T delta_Qwen the role of the interaction. Prediction is beta_j + u_i^T v_j with beta_j = v_j(baseline); observed is the coalition's empirical logit. beta_Qwen = +2.879, beta_Gemma = +1.330.
+ 
+| Coalition | u*vbar | u*delta_Qwen | beta_j+ui^Tvj (prediction) Qwen | observation Qwen | beta_j+ui^Tvj (prediction) Gemma | observation Gemma |
+|---|---|---|---|---|---|---|
+| `baseline_empty` | +0.000 | +0.000 | +2.879 | +2.879 | +1.330 | +1.330 |
+| `grand_all10` | -0.355 | -0.005 | +2.519 | +2.520 | +0.980 | +0.979 |
+| `addone_Q` | +0.214 | +0.049 | +3.142 | +3.030 | +1.494 | +1.771 |
+| `addone_W` | -0.184 | +0.175 | +2.870 | +2.520 | +0.971 | +1.246 |
+| `addone_OP` | -0.084 | -0.035 | +2.760 | +2.628 | +1.280 | +1.330 |
+| `addone_KS` | -0.015 | +0.097 | +2.961 | +2.747 | +1.218 | +1.418 |
+| `addone_TB` | -0.033 | -0.086 | +2.760 | +2.628 | +1.384 | +1.707 |
+| `addone_CP` | -0.134 | -0.084 | +2.661 | +2.421 | +1.280 | +1.601 |
+| `addone_SS` | -0.089 | -0.071 | +2.719 | +2.520 | +1.312 | +1.551 |
+| `addone_BR` | -0.056 | -0.062 | +2.760 | +2.628 | +1.336 | +1.653 |
+| `addone_ET` | -0.021 | +0.044 | +2.902 | +2.628 | +1.265 | +1.511 |
+| `addone_EV` | +0.048 | -0.032 | +2.895 | +2.747 | +1.410 | +1.511 |
+| `loo_Q` | -0.569 | -0.055 | +2.256 | +2.747 | +0.816 | +1.206 |
+| `loo_W` | -0.171 | -0.180 | +2.528 | +2.628 | +1.339 | +1.715 |
+| `loo_OP` | -0.270 | +0.029 | +2.638 | +3.030 | +1.030 | +1.206 |
+| `loo_KS` | -0.340 | -0.102 | +2.437 | +2.747 | +1.092 | +1.418 |
+| `loo_TB` | -0.322 | +0.081 | +2.638 | +3.030 | +0.926 | +1.330 |
+| `loo_CP` | -0.221 | +0.079 | +2.737 | +3.030 | +1.030 | +1.418 |
+| `loo_SS` | -0.266 | +0.066 | +2.679 | +3.030 | +0.998 | +1.330 |
+| `loo_BR` | -0.298 | +0.057 | +2.638 | +3.030 | +0.974 | +1.373 |
+| `loo_ET` | -0.334 | -0.049 | +2.496 | +2.747 | +1.045 | +1.418 |
+| `loo_EV` | -0.403 | +0.027 | +2.503 | +2.879 | +0.900 | +1.127 |
+| `pair_Q_W` | +0.030 | +0.224 | +3.133 | +3.671 | +1.135 | +1.418 |
+| `pair_Q_CP` | +0.080 | -0.035 | +2.924 | +2.879 | +1.444 | +1.661 |
+| `pair_Q_SS` | +0.125 | -0.022 | +2.982 | +3.412 | +1.476 | +1.661 |
+| `pair_W_CP` | -0.318 | +0.091 | +2.652 | +2.330 | +0.921 | +1.127 |
+| `pair_W_SS` | -0.273 | +0.104 | +2.710 | +2.520 | +0.953 | +1.052 |
+| `pair_CP_SS` | -0.223 | -0.155 | +2.501 | +2.520 | +1.262 | +1.829 |
+| `lt2o_Q_W` | -0.385 | -0.229 | +2.265 | +2.879 | +1.175 | +1.418 |
+| `lt2o_Q_CP` | -0.434 | +0.029 | +2.474 | +2.421 | +0.866 | +1.206 |
+| `lt2o_Q_SS` | -0.479 | +0.017 | +2.416 | +2.166 | +0.834 | +1.052 |
+| `lt2o_W_CP` | -0.037 | -0.096 | +2.746 | +2.421 | +1.389 | +1.771 |
+| `lt2o_W_SS` | -0.082 | -0.109 | +2.688 | +3.030 | +1.357 | +1.511 |
+| `lt2o_CP_SS` | -0.132 | +0.150 | +2.897 | +2.879 | +1.048 | +1.463 |
+
 ## Interaction delta_Qwen = v_Qwen - vbar
 
 With J = 2, delta_Gemma = -delta_Qwen identically.
@@ -92,16 +133,6 @@ With J = 2, delta_Gemma = -delta_Qwen identically.
 | ET | +0.044 | 0.081 | [-0.108, +0.203] | 
 | OP | -0.034 | 0.087 | [-0.215, +0.121] | 
 | EV | -0.032 | 0.096 | [-0.220, +0.162] | 
-
-
-## Goodness of fit
-
-| | Qwen | Gemma |
-|---|---|---|
-| Constrained (the phi above) | +0.055 | -0.773 |
-| Same phi, anchor released | +0.098 | +0.675 |
-| Separate unweighted OLS, free intercept | +0.491 | +0.720 |
-
 
 ## Files
 - `analyze_shapley_v3.py`: analysis script (constrained WLS, bootstrap CIs)
