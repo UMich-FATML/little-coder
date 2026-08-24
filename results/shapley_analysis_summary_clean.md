@@ -135,7 +135,8 @@ With J = 2, delta_Gemma = -delta_Qwen identically.
 | EV | -0.032 | 0.096 | [-0.220, +0.162] | 
 
 ## Files
+ 
 - `analyze_shapley_v3.py`: analysis script (constrained WLS, bootstrap CIs)
-- `uv_reconstruction.py`: saturated-model decomposition and reconstruction
+- `uv_reconstruction.py`: bilinear decomposition and reconstruction
 - `shapley_v3_results.json`: full numeric output
-- `ablation_qwen_11player/`, `ablation_gemma_11player/`: per-task result files per model (46 configurations on disk; 34 enter the fit)
+- `ablation_qwen_11player_clean/`, `ablation_gemma_11player_clean/`: per-task result files, 46 configurations on disk, 34 entering the fit
