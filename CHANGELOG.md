@@ -2,6 +2,15 @@
 
 All notable changes to little-coder are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and little-coder's public interface (CLI, providers, tools, skills) follows semver starting at `v0.0.1` post-rename.
 
+## [v0.1.14] — 2026-08-27
+
+### Fixed — benchmark recovery regressions (restores May reference behavior)
+- **quality-monitor: `deliverAs: "steer"` restored (issue #16).** Correction messages for detected failure modes (repeated_tool_call, empty_tool_name, …) were being sent with `deliverAs: "followUp"`, which parks the message until the next user input. Benchmark runs have no next user input, so every recovery nudge was discarded. Back to prompt next-turn injection.
+- **thinking-budget: recovery race fix restored (issue #8).** The `recoveryPending` re-entry gate, the `agent_start` state reset, and the one-tick `setImmediate` before queuing the "commit to an implementation" follow-up after an abort had been dropped; without them the recovery message silently drops on fast streams and the agent appears to stop.
+- **skill-inject: `LITTLE_CODER_ALLOWED_TOOLS` env fallback restored.** Pi runs `before_agent_start` handlers in extension load order (alphabetical), so skill-inject fires before tool-gating publishes `allowedTools`; without the env fallback, unfiltered Read/Write/Edit/Grep/Bash guidance cards were injected into benchmark prompts whose real tool set is an allow-listed subset.
+
+Impact, measured through the agentic rollout engine on a seeded 10-task terminal-bench-2.1 slice (same endpoint, same tasks, one attempt each): restoring these fixes moves accuracy from 2/10 (with ~2.5 empty_response stalls per trial) to 4/10, exactly reproducing the May reference stack's pass-set. Same class of miss as v0.1.10's `benchmark-profiles` temperature bug and v0.1.13's AGENTS.md regression: whitepaper-era mechanisms that had silently diverged from the validated reference branch.
+
 ## [v0.1.13] — 2026-04-24
 
 ### Fixed — system prompt fidelity

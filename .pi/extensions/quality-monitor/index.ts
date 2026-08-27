@@ -2,9 +2,9 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { assessResponse, buildCorrectionMessage, type ToolCall } from "./quality.ts";
 
 // Port of local/quality.py. Hooks turn_end, inspects the assistant message
-// + previous turn's tool calls, and — if we detect a failure mode — queues
-// a correction user message via session.followUp() so the model gets a
-// chance to recover on its next turn.
+// + previous turn's tool calls, and — if we detect a failure mode — sends
+// a correction user message with deliverAs:"steer" so the model gets it
+// immediately on its next turn rather than waiting for the next user input.
 
 // Session-scoped state. Pi reuses extensions across turns within a session;
 // a fresh extension instance is loaded per session via the session lifecycle.
@@ -62,9 +62,12 @@ export default function (pi: ExtensionAPI) {
 
     const correction = buildCorrectionMessage(verdict.reason);
     ctx.ui.notify(
-      `quality-monitor: ${verdict.reason} → queued correction`,
+      `quality-monitor: ${verdict.reason} → injecting correction`,
       "warning",
     );
-    pi.sendUserMessage(correction, { deliverAs: "followUp" });
+    // "steer" delivers the correction promptly to the in-flight loop. The
+    // prior "followUp" mode parked the message until the *next* user input,
+    // by which point it was no longer relevant (issue #16).
+    pi.sendUserMessage(correction, { deliverAs: "steer" });
   });
 }

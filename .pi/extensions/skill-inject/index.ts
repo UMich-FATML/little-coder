@@ -140,8 +140,17 @@ export default function (pi: ExtensionAPI) {
     const budget: number = lc.skillTokenBudget ?? 300;
     if (budget <= 0) return;
 
-    const allowedList: string[] | undefined = lc.allowedTools;
-    const allowed = allowedList ? new Set(allowedList) : undefined;
+    // Allow-list source: prefer systemPromptOptions (set by tool-gating's
+    // before_agent_start), but fall back to LITTLE_CODER_ALLOWED_TOOLS env
+    // directly. Pi runs before_agent_start handlers in extension load order
+    // (alphabetical), so skill-inject fires before tool-gating and
+    // lc.allowedTools is undefined on the first turn unless we read env here.
+    let allowedList: string[] | undefined = lc.allowedTools;
+    if (!allowedList && process.env.LITTLE_CODER_ALLOWED_TOOLS) {
+      allowedList = process.env.LITTLE_CODER_ALLOWED_TOOLS
+        .split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    const allowed = allowedList && allowedList.length > 0 ? new Set(allowedList) : undefined;
 
     // Knowledge-inject may publish required_tools on systemPromptOptions —
     // pre-add those before selecting so they win even when budget is tight.
