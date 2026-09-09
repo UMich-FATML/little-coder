@@ -3,6 +3,8 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 const LLAMACPP_BASE_URL = process.env.LLAMACPP_BASE_URL || "http://127.0.0.1:8888/v1";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434/v1";
 const OPENAI_COMPAT_BASE_URL = process.env.OPENAI_COMPAT_BASE_URL || "http://fs-mbz-gpu-257:8000/v1";
+const OPENAI_COMPAT_MODEL_ID = process.env.OPENAI_COMPAT_MODEL_ID || "qwen/qwen3.6-35b-a3b";
+const OPENAI_COMPAT_MAX_TOKENS = Number(process.env.OPENAI_COMPAT_MAX_TOKENS) || 4096;
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("llamacpp", {
@@ -54,16 +56,17 @@ export default function (pi: ExtensionAPI) {
     api: "openai-completions",
     models: [
       {
-        id: "qwen/qwen3.6-35b-a3b",
-        name: "Qwen3.6-35B-A3B (remote OpenAI-compatible)",
+        id: OPENAI_COMPAT_MODEL_ID,
+        name: `${OPENAI_COMPAT_MODEL_ID} (remote OpenAI-compatible)`,
         reasoning: true,
         input: ["text"],
         contextWindow: 40960,
-        maxTokens: 4096,
+        maxTokens: OPENAI_COMPAT_MAX_TOKENS,
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         compat: {
           supportsDeveloperRole: false,
           supportsReasoningEffort: false,
+          thinkingFormat: "qwen-chat-template",
         },
       },
     ],

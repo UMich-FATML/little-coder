@@ -1,0 +1,23 @@
+--- a/node_modules/@mariozechner/pi-ai/dist/providers/openai-completions.js
++++ b/node_modules/@mariozechner/pi-ai/dist/providers/openai-completions.js
+@@ -631,6 +631,20 @@
+                     assistantMsg.reasoning_details = reasoningDetails;
+                 }
+             }
++            // k2-horizon template ("qwen-chat-template" thinkingFormat) rejects
++            // assistant messages that carry tool_calls without a thinking field
++            // (HTTP 400 "Assistant message is missing a thinking field"). A turn
++            // whose reasoning came back empty would otherwise drop the field
++            // entirely, so attach an explicit empty reasoning_content.
++            if (compat.thinkingFormat === "qwen-chat-template" &&
++                model.reasoning &&
++                toolCalls.length > 0 &&
++                assistantMsg.reasoning_content === undefined &&
++                assistantMsg.reasoning === undefined &&
++                assistantMsg.reasoning_text === undefined &&
++                assistantMsg.thinking === undefined) {
++                assistantMsg.reasoning_content = "";
++            }
+             // Skip assistant messages that have no content and no tool calls.
+             // Some providers require "either content or tool_calls, but not none".
+             // Other providers also don't accept empty assistant messages.
